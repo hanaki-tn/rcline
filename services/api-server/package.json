@@ -8,7 +8,8 @@
     "init-db": "node scripts/init-db.js",
     "check-members": "node scripts/check-members.js",
     "oauth-setup": "node scripts/oauth-setup.js",
-    "sync-sheets": "node scripts/sync-sheets.js"
+    "sync-sheets": "node scripts/sync-sheets.js",
+    "insert-member": "node scripts/insert-member.js"
   },
   "dependencies": {
     "express": "^4.19.2",
