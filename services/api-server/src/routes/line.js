@@ -43,6 +43,12 @@ router.post('/webhook', async (req, res) => {
 
 // 署名検証
 function verifySignature(body, channelSecret, signature) {
+  // 開発環境では署名検証をスキップ
+  if (process.env.DEV_ALLOW_INSECURE === '1') {
+    console.log('DEV: Signature verification skipped');
+    return true;
+  }
+  
   if (!signature || !channelSecret) return false;
   
   const bodyStr = JSON.stringify(body);

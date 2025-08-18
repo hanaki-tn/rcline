@@ -27,6 +27,7 @@ services:
       - GOOGLE_REFRESH_TOKEN=${GOOGLE_REFRESH_TOKEN}
       - ADMIN_USERNAME=${ADMIN_USERNAME}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - DEV_ALLOW_INSECURE=${DEV_ALLOW_INSECURE:-1}
     volumes:
       - sqlite_data:/app/data
       - files_storage:/app/files
