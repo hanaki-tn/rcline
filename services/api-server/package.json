@@ -10,7 +10,8 @@
     "oauth-setup": "node scripts/oauth-setup.js",
     "sync-sheets": "node scripts/sync-sheets.js",
     "insert-member": "node scripts/insert-member.js",
-    "fix-member": "node scripts/fix-member-data.js"
+    "fix-member": "node scripts/fix-member-data.js",
+    "test-linking": "node scripts/test-linking.js"
   },
   "dependencies": {
     "express": "^4.19.2",
