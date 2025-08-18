@@ -1,0 +1,193 @@
+n8n導入メモ（Difyサーバを再利用）
+==================================
+
+📅 実施日：2025年7月30日
+🧑 実施者：花木 英雄
+📍 サーバ情報：
+- VPS：エックスサーバ VPS
+- IP：162.43.19.162
+- ドメイン：awf.technavigation.jp
+- OS：Ubuntu 22.04
+- SSH接続方法：PuTTY（id_ed25519_new.ppk を使用）
+
+Step 0. 既存Difyの停止（80/443番ポート解放）
+----------------------------------------------
+Difyが自動起動しないように以下を実行：
+
+docker stop docker-nginx-1 docker-api-1 docker-web-1 docker-worker-1 \
+            docker-db-1 docker-redis-1 docker-sandbox-1 docker-ssrf_proxy-1 docker-weaviate-1
+
+docker update --restart=no $(docker ps -a -q)
+docker ps  # 確認
+
+Step 1. n8n導入準備
+--------------------
+mkdir -p /opt/n8n/{data,caddy}
+cd /opt/n8n
+openssl rand -hex 32 > .encryption_key
+chmod 600 .encryption_key
+chown -R 1000:1000 /opt/n8n/data
+
+Step 2. .env 設定
+------------------
+cat <<EOF > .env
+DOMAIN=awf.technavigation.jp
+N8N_ENCRYPTION_KEY=$(cat .encryption_key)
+N8N_USER=admin
+N8N_PASSWORD=任意の強いパスワード
+TZ=Asia/Tokyo
+EOF
+
+Step 3. docker-compose.yml 作成
+--------------------------------
+cat <<'EOF' > docker-compose.yml
+version: "3.8"
+services:
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    restart: unless-stopped
+    environment:
+      - N8N_HOST=${DOMAIN}
+      - WEBHOOK_URL=https://${DOMAIN}/
+      - N8N_PORT=5678
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      - GENERIC_TIMEZONE=${TZ}
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_USER}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD}
+    volumes:
+      - ./data:/home/node/.n8n
+
+  caddy:
+    image: caddy:latest
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
+      - ./caddy/data:/data
+      - ./caddy/config:/config
+    depends_on:
+      - n8n
+EOF
+
+Step 4. Caddyfile 設定（HTTPS対応）
+-------------------------------------
+cat <<'EOF' > ./caddy/Caddyfile
+awf.technavigation.jp {
+    encode gzip
+    reverse_proxy n8n:5678
+}
+EOF
+
+Step 5. 起動
+-------------
+docker compose --env-file .env up -d
+
+# 起動ログ例：
+# ✔ Container n8n-n8n-1    Started
+# ✔ Container n8n-caddy-1  Started
+
+Step 6. アクセス
+-----------------
+ブラウザから https://awf.technavigation.jp にアクセスし、
+n8nの初期セットアップ画面（Email / 名前 / パスワード入力）を確認。
+
+補足
+----
+- n8nの設定変更は /opt/n8n 配下で行う
+- コンテナ更新：docker compose pull && docker compose up -d
+- 最初に .env で設定した Basic 認証（admin / パスワード）を求められる
+
+==================================
+ docker memo（2025.08.18）
+==================================
+
+root@x162-43-19-162:/opt/n8n# cat docker-compose.yml
+version: "3.8"
+services:
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    restart: unless-stopped
+    environment:
+      - N8N_HOST=${DOMAIN}
+      - WEBHOOK_URL=https://${DOMAIN}/
+      - N8N_PORT=5678
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      - GENERIC_TIMEZONE=${TZ}
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_USER}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD}
+    volumes:
+      - ./data:/home/node/.n8n
+    env_file:
+      - .env
+
+  caddy:
+    image: caddy:latest
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
+      - ./caddy/data:/data
+      - ./caddy/config:/config
+      - /opt/www:/opt/www:ro        # ★RCの公式LINEでLIFFを使うために追加。（会員確認のために、静的画面を追加するため）
+    depends_on:
+      - n8n
+root@x162-43-19-162:/opt/n8n#
+
+==================================
+ ご参考：公式LINE webhook （以前の仕様で、お友達登録時に実行されるhtml。当時は会員IDを入力させ、それをn8nに送っていた）
+==================================
+root@x162-43-19-162:/opt/n8n# cat /opt/www/register.html
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>会員ID登録</title>
+  <script src="https://static.line-scdn.net/liff/edge/2.1/sdk.js"></script>
+  <style>body{font-family:sans-serif;padding:1.5rem;}</style>
+</head>
+<body>
+  <h2>会員IDを入力してください</h2>
+  <input id="member" type="text" placeholder="例: A-001" style="width:100%;padding:8px">
+  <button id="submit" style="margin-top:1rem;padding:8px 16px">登録する</button>
+
+  <script>
+    // 1) LIFF 初期化
+    liff.init({ liffId: "2007866921-qY9ZPxWN" }).then(() => {
+      if (!liff.isLoggedIn()) { liff.login(); return; }
+
+      document.getElementById('submit').onclick = async () => {
+        const memberId = document.getElementById('member').value.trim();
+        if (!memberId) { alert('会員IDを入力してください'); return; }
+
+        // 2) プロフィール取り出し
+        const profile = await liff.getProfile();             // ← userId 取得 :contentReference[oaicite:1]{index=1}
+        const userId   = profile.userId;
+
+        // 3) n8n STEP2 へ POST
+        const res = await fetch(
+          "https://awf.technavigation.jp/webhook/register_step2",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              member_id: memberId,
+              user_id  : userId
+            })
+          }
+        );
+        const txt = await res.text();
+        alert(txt);               // n8n 側で JSON 返すならダイアログや画面遷移に変更可
+        liff.closeWindow();       // LINE に戻る（任意）
+      };
+    });
+  </script>
+</body>
+</html>
+root@x162-43-19-162:/opt/n8n#
+

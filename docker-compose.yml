@@ -1,0 +1,86 @@
+services:
+  # メインAPIサーバー（管理画面 + LIFF API + LINE webhook）
+  api-server:
+    build: ./services/api-server
+    ports:
+      - "4000:4000"
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=${NODE_ENV:-development}
+      - PORT=4000
+      - LINE_CHANNEL_SECRET=${LINE_CHANNEL_SECRET}
+      - LINE_CHANNEL_ACCESS_TOKEN=${LINE_CHANNEL_ACCESS_TOKEN}
+      - LIFF_ID=${LIFF_ID}
+      - DATABASE_PATH=/app/data/rcline.db
+      - FILES_BASE_PATH=/app/files
+      - LOGS_BASE_PATH=/app/logs
+      - FILES_PUBLIC_URL_BASE=${FILES_PUBLIC_URL_BASE:-http://localhost/files}
+      - REDIS_URL=redis://redis:6379
+      - ONBOARDING_MODE=${ONBOARDING_MODE:-silent}
+      - ONBOARDING_NAME_NFKC=${ONBOARDING_NAME_NFKC:-0}
+      - JWT_SECRET=${JWT_SECRET}
+      - SESSION_SECRET=${SESSION_SECRET}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - GOOGLE_SHEETS_ID=${GOOGLE_SHEETS_ID}
+      - GOOGLE_SHEET_NAME=${GOOGLE_SHEET_NAME}
+      - GOOGLE_REFRESH_TOKEN=${GOOGLE_REFRESH_TOKEN}
+      - ADMIN_USERNAME=${ADMIN_USERNAME}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+    volumes:
+      - sqlite_data:/app/data
+      - files_storage:/app/files
+      - logs_storage:/app/logs
+    networks: [rcline]
+    depends_on:
+      - redis
+      - caddy
+
+  # Redis（ジョブキュー用）
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    networks: [rcline]
+
+  # 既存linehook（削除予定、移行完了まで保持）
+  linehook:
+    build: ./services/linehook
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    environment:
+      - LINE_CHANNEL_SECRET=${LINE_CHANNEL_SECRET}
+      - LINE_CHANNEL_ACCESS_TOKEN=${LINE_CHANNEL_ACCESS_TOKEN}
+      - N8N_REGISTER_WEBHOOK_URL=${N8N_REGISTER_WEBHOOK_URL}
+      - PORT=3000
+      - DEV_ALLOW_INSECURE=${DEV_ALLOW_INSECURE:-1}
+      - FETCH_TIMEOUT_MS=${FETCH_TIMEOUT_MS:-4000}
+    networks: [rcline]
+    depends_on:
+      - caddy
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+      - files_storage:/var/www/files:ro
+    networks: [rcline]
+
+networks:
+  rcline: {}
+
+volumes:
+  caddy_data: {}
+  caddy_config: {}
+  sqlite_data: {}
+  files_storage: {}
+  logs_storage: {}
+  redis_data: {}

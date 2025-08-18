@@ -1,0 +1,33 @@
+{
+  "name": "rc-line-api-server",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "init-db": "node scripts/init-db.js",
+    "check-members": "node scripts/check-members.js",
+    "oauth-setup": "node scripts/oauth-setup.js",
+    "sync-sheets": "node scripts/sync-sheets.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "sqlite3": "^5.1.6",
+    "redis": "^4.6.13",
+    "bull": "^4.12.2",
+    "bcryptjs": "^2.4.3",
+    "multer": "^1.4.5-lts.1",
+    "sharp": "^0.33.4",
+    "cors": "^2.8.5",
+    "helmet": "^7.1.0",
+    "express-session": "^1.18.0",
+    "express-rate-limit": "^7.2.0",
+    "crypto": "^1.0.1",
+    "uuid": "^9.0.1",
+    "axios": "^1.7.2",
+    "googleapis": "^140.0.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  }
+}
