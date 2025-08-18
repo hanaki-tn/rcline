@@ -1,5 +1,8 @@
 FROM node:20-alpine
 
+# Install sqlite3 for direct database access
+RUN apk add --no-cache sqlite
+
 WORKDIR /app
 
 # Install dependencies
