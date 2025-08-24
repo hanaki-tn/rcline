@@ -11,8 +11,8 @@ awf.technavigation.jp {
         file_server
     }
 
-    # RC LINE システム - 新URL構造
-    handle_path /rcline/api/* {
+    # RC LINE システム - 新URL構造（API）
+    handle /rcline/api/* {
         reverse_proxy api-server:4000
     }
     
