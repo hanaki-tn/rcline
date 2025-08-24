@@ -13,9 +13,10 @@ awf.technavigation.jp {
 
     # RC LINE システム - 新URL構造（API）
     handle /rcline/api/* {
+        uri strip_prefix /rcline
         reverse_proxy api-server:4000
     }
-    
+
     # RC LINE LIFF画面
     handle_path /rcline/* {
         root * /var/www/rcline
@@ -30,7 +31,7 @@ awf.technavigation.jp {
 
     # n8n webhook path
     handle_path /webhook/* {
-        reverse_proxy n8n:5678
+        reverse_proxy api-server:4000
     }
 
     # linehook: 既存Node service（移行完了まで保持）
@@ -39,5 +40,5 @@ awf.technavigation.jp {
     }
 
     # default upstream (adjust to your infra)
-    reverse_proxy n8n:5678
+    reverse_proxy api-server:4000
 }
