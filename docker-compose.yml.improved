@@ -1,0 +1,82 @@
+# 本番・開発共通のベース構成
+version: '3.8'
+
+services:
+  # メインAPIサーバー
+  api-server:
+    build: ./services/api-server
+    restart: unless-stopped
+    
+    # 本番用環境変数（最小限）
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - PORT=4000
+      
+      # LINE API
+      - LINE_CHANNEL_SECRET=${LINE_CHANNEL_SECRET}
+      - LINE_CHANNEL_ACCESS_TOKEN=${LINE_CHANNEL_ACCESS_TOKEN}
+      - LIFF_ID=${LIFF_ID}
+      
+      # データベース・ストレージ
+      - DATABASE_PATH=/app/data/rcline.db
+      - FILES_BASE_PATH=/app/files
+      - LOGS_BASE_PATH=/app/logs
+      
+      # 外部サービス
+      - REDIS_URL=redis://redis:6379
+      
+      # セキュリティ
+      - JWT_SECRET=${JWT_SECRET}
+      - SESSION_SECRET=${SESSION_SECRET}
+      
+      # 管理者認証
+      - ADMIN_USERNAME=${ADMIN_USERNAME}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      
+      # オプション機能（必要時のみ）
+      - FILES_PUBLIC_URL_BASE=${FILES_PUBLIC_URL_BASE}
+      - ONBOARDING_MODE=${ONBOARDING_MODE:-silent}
+    
+    # 永続化ボリューム
+    volumes:
+      - sqlite_data:/app/data
+      - files_storage:/app/files
+      - logs_storage:/app/logs
+    
+    networks: [rcline]
+    depends_on:
+      - redis
+      - caddy
+
+  # Redis（ジョブキュー・セッション用）
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    networks: [rcline]
+
+  # Caddy（リバースプロキシ・HTTPS）
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+      - files_storage:/var/www/files:ro
+    networks: [rcline]
+
+networks:
+  rcline: {}
+
+volumes:
+  caddy_data: {}
+  caddy_config: {}
+  sqlite_data: {}
+  files_storage: {}
+  logs_storage: {}
+  redis_data: {}

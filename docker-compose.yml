@@ -32,10 +32,11 @@ services:
       - sqlite_data:/app/data
       - files_storage:/app/files
       - logs_storage:/app/logs
+      - ./services/api-server/public:/app/public  # 開発用: publicディレクトリをマウント
     networks: [rcline]
     depends_on:
       - redis
-      - caddy
+      # - caddy  # 一時無効化
 
   # Redis（ジョブキュー用）
   redis:

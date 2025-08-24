@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JavaScript テスト</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        button { 
+            background: #007bff; color: white; padding: 10px 20px; 
+            border: none; border-radius: 4px; cursor: pointer; margin: 5px;
+        }
+        button:hover { background: #0056b3; }
+        #result { margin: 10px 0; padding: 10px; border: 1px solid #ddd; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>JavaScript 動作テスト</h1>
+    
+    <div>
+        <h2>インライン onclick テスト</h2>
+        <button onclick="testInlineClick()">インラインクリック</button>
+        <button onclick="alert('直接alert')">直接Alert</button>
+    </div>
+    
+    <div>
+        <h2>addEventListener テスト</h2>
+        <button id="event-btn">EventListener</button>
+    </div>
+    
+    <div>
+        <h2>外部スクリプト関数テスト</h2>
+        <button onclick="testExternalFunction()">外部関数</button>
+    </div>
+    
+    <div>
+        <h2>API テスト</h2>
+        <button onclick="testAPI()">ヘルスチェック</button>
+    </div>
+    
+    <div id="result">結果が表示されます</div>
+    
+    <script>
+        // インラインスクリプトテスト
+        function testInlineClick() {
+            document.getElementById('result').innerHTML = 'インラインクリック成功！ ' + new Date().toLocaleTimeString();
+        }
+        
+        // EventListener テスト
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('event-btn').addEventListener('click', function() {
+                document.getElementById('result').innerHTML = 'EventListener成功！ ' + new Date().toLocaleTimeString();
+            });
+        });
+        
+        // API テスト
+        async function testAPI() {
+            const resultDiv = document.getElementById('result');
+            try {
+                const response = await fetch('/health');
+                const data = await response.json();
+                resultDiv.innerHTML = 'API成功: ' + JSON.stringify(data);
+            } catch (error) {
+                resultDiv.innerHTML = 'APIエラー: ' + error.message;
+            }
+        }
+    </script>
+    
+    <script src="admin-script.js"></script>
+    
+    <script>
+        // 外部スクリプト関数テスト
+        function testExternalFunction() {
+            if (typeof checkAuth === 'function') {
+                document.getElementById('result').innerHTML = '外部関数checkAuthが見つかりました！';
+                checkAuth();
+            } else {
+                document.getElementById('result').innerHTML = '外部関数checkAuthが見つかりません';
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,1040 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RC公式LINE 管理画面 - Demo</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .card { background: white; padding: 20px; margin: 20px 0; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .login-form { max-width: 400px; margin: 50px auto; }
+        .form-group { margin: 15px 0; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input, select, textarea { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+        button { background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        button.danger { background: #dc3545; }
+        button.danger:hover { background: #c82333; }
+        .success { color: #28a745; }
+        .error { color: #dc3545; }
+        .member-list, .audience-list { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background-color: #f8f9fa; }
+        .badge { padding: 2px 8px; border-radius: 12px; font-size: 12px; }
+        .badge-member { background: #e3f2fd; color: #1976d2; }
+        .badge-staff { background: #fff3e0; color: #f57c00; }
+        .badge-linked { background: #e8f5e8; color: #2e7d32; }
+        .badge-unlinked { background: #ffebee; color: #d32f2f; }
+        .hidden { display: none; }
+        .nav { margin: 20px 0; }
+        .nav button { margin-right: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- ログイン画面 -->
+        <div id="login-section" class="card">
+            <div class="login-form">
+                <h2>RC公式LINE 管理画面</h2>
+                <div class="form-group">
+                    <label for="username">ユーザー名:</label>
+                    <input type="text" id="username" value="hanaki">
+                </div>
+                <div class="form-group">
+                    <label for="password">パスワード:</label>
+                    <input type="password" id="password" value="vLJCUJ">
+                </div>
+                <button onclick="login()">ログイン</button>
+                <div id="login-message" class="error"></div>
+            </div>
+        </div>
+
+        <!-- メイン管理画面 -->
+        <div id="main-section" class="hidden">
+            <h1>RC公式LINE 管理画面</h1>
+            <div class="nav">
+                <button onclick="showSection('members')">会員一覧</button>
+                <button onclick="showSection('audiences')">audiences管理</button>
+                <button onclick="showSection('audience-members')" id="audience-members-btn" class="hidden">audienceメンバー管理</button>
+                <button onclick="showSection('events')">イベント管理</button>
+                <button onclick="logout()" class="danger">ログアウト</button>
+            </div>
+
+            <!-- 会員一覧セクション -->
+            <div id="members-section" class="card">
+                <h3>会員一覧</h3>
+                <div class="form-group">
+                    <label for="role-filter">Role フィルタ:</label>
+                    <select id="role-filter" onchange="loadMembers()">
+                        <option value="">すべて</option>
+                        <option value="member" selected>member のみ</option>
+                        <option value="staff">staff のみ</option>
+                    </select>
+                </div>
+                <div class="member-list">
+                    <table id="members-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>名前</th>
+                                <th>Role</th>
+                                <th>LINE紐づけ</th>
+                                <th>送信対象</th>
+                                <th>表示順</th>
+                            </tr>
+                        </thead>
+                        <tbody id="members-tbody"></tbody>
+                    </table>
+                </div>
+                <button onclick="loadMembers()">更新</button>
+            </div>
+
+            <!-- audiences管理セクション -->
+            <div id="audiences-section" class="card">
+                <h3>Audiences管理</h3>
+                
+                <!-- 新規作成 -->
+                <div class="form-group">
+                    <h4>新規audience作成</h4>
+                    <label for="audience-name">名前:</label>
+                    <input type="text" id="audience-name" placeholder="例: 理事会">
+                    <label for="audience-sort">ソート順:</label>
+                    <input type="number" id="audience-sort" placeholder="1">
+                    <button onclick="createAudience()">作成</button>
+                </div>
+
+                <!-- 一覧 -->
+                <div class="audience-list">
+                    <table id="audiences-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>名前</th>
+                                <th>ソート順</th>
+                                <th>作成日時</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="audiences-tbody"></tbody>
+                    </table>
+                </div>
+                <button onclick="loadAudiences()">更新</button>
+                <div id="audience-message"></div>
+            </div>
+
+            <!-- audienceメンバー管理セクション -->
+            <div id="audience-members-section" class="card hidden">
+                <h3>Audienceメンバー管理</h3>
+                <div id="audience-info">
+                    <h4 id="current-audience-name">-</h4>
+                    <button onclick="showSection('audiences')">← audiences一覧に戻る</button>
+                </div>
+                
+                <div class="form-group">
+                    <h4>現在の所属メンバー</h4>
+                    <div id="current-members">読み込み中...</div>
+                </div>
+                
+                <div class="form-group">
+                    <h4>メンバー選択</h4>
+                    <div style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; border-radius: 4px;">
+                        <div id="member-selection">読み込み中...</div>
+                    </div>
+                    <button onclick="saveAudienceMembers()" style="margin-top: 10px;">選択したメンバーを保存</button>
+                    <div id="member-save-message"></div>
+                </div>
+            </div>
+
+            <!-- イベント管理セクション -->
+            <div id="events-section" class="card hidden">
+                <h3>イベント管理</h3>
+                <!-- イベント一覧 -->
+                <div class="form-group">
+                    <h4>イベント一覧</h4>
+                    <button onclick="loadEvents()">読み込み</button>
+                    <div id="events-list">読み込み中...</div>
+                </div>
+                
+                <!-- イベント作成フォーム -->
+                <div class="form-group">
+                    <h4>新規イベント作成</h4>
+                    <form id="event-form" enctype="multipart/form-data">
+                        <div class="form-group">
+                            <label for="event-title">タイトル（必須）:</label>
+                            <input type="text" id="event-title" name="title" required maxlength="100" placeholder="例: 定例会議">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="event-held-at">開催日時（必須）:</label>
+                            <input type="datetime-local" id="event-held-at" name="held_at" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="event-body">本文:</label>
+                            <textarea id="event-body" name="body" rows="3" maxlength="2000" placeholder="出欠のご回答をお願いします。&#10;詳細・回答は以下のリンクからご確認ください。"></textarea>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="event-image">画像（JPG、必須、5MB以下）:</label>
+                            <input type="file" id="event-image" name="image" accept="image/jpeg" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="extra-text-enabled" name="extra_text_enabled">
+                                追加メモ欄を有効にする
+                            </label>
+                            <div id="extra-text-options" class="hidden" style="margin-left: 20px;">
+                                <div class="form-group">
+                                    <label for="extra-text-label">メモ欄のラベル:</label>
+                                    <input type="text" id="extra-text-label" name="extra_text_label" value="備考" maxlength="50">
+                                </div>
+                                <div class="form-group">
+                                    <label>
+                                        <input type="checkbox" id="extra-text-attend-only" name="extra_text_attend_only" checked>
+                                        出席時のみ表示
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <h4>配信対象選択</h4>
+                            <div id="audience-selection">
+                                <div style="margin: 10px 0;">
+                                    <label>
+                                        <input type="checkbox" id="select-all-members" onchange="toggleAllMembers()">
+                                        全員
+                                    </label>
+                                </div>
+                                <div id="audience-checkboxes">読み込み中...</div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <h4>受信者プレビュー</h4>
+                            <div id="target-preview">配信対象を選択してください</div>
+                            <button type="button" onclick="updateTargetPreview()">プレビュー更新</button>
+                        </div>
+                        
+                        <button type="submit" id="event-create-button">イベント作成＆送信</button>
+                        <div id="event-create-message"></div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- イベント詳細セクション -->
+            <div id="event-detail-section" class="card hidden">
+                <h3>イベント詳細</h3>
+                <div>
+                    <button onclick="showSection('events')">← イベント一覧に戻る</button>
+                </div>
+                
+                <div id="event-detail-content">読み込み中...</div>
+                
+                <!-- 基本情報 -->
+                <div class="form-group">
+                    <h4>基本情報</h4>
+                    <div id="event-basic-info">-</div>
+                </div>
+                
+                <!-- 送信要約 -->
+                <div class="form-group">
+                    <h4>送信要約</h4>
+                    <div id="event-push-summary">-</div>
+                </div>
+                
+                <!-- 画像表示 -->
+                <div class="form-group">
+                    <h4>画像</h4>
+                    <div id="event-image-display">-</div>
+                </div>
+                
+                <!-- 出欠状況 -->
+                <div class="form-group">
+                    <h4>出欠状況</h4>
+                    <div id="event-attendance-summary">-</div>
+                    <div style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; border-radius: 4px;">
+                        <div id="event-attendance-list">-</div>
+                    </div>
+                </div>
+                
+                <!-- CSV出力 -->
+                <div class="form-group">
+                    <h4>CSV出力</h4>
+                    <button onclick="downloadCSV('latest')" id="csv-latest-btn">最新状態をダウンロード</button>
+                    <button onclick="downloadCSV('history')" id="csv-history-btn">回答履歴をダウンロード</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentUser = null;
+        let currentSection = 'members';
+        let currentAudienceId = null;
+        let currentAudienceName = null;
+        let currentEventId = null;
+        let currentEventTitle = null;
+        let allMembers = [];
+        let audiencesData = [];
+
+        // ログイン
+        async function login() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const messageDiv = document.getElementById('login-message');
+
+            try {
+                const response = await fetch('/api/admin/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    currentUser = data.user;
+                    messageDiv.innerHTML = '<span class="success">ログイン成功</span>';
+                    document.getElementById('login-section').classList.add('hidden');
+                    document.getElementById('main-section').classList.remove('hidden');
+                    showSection('members');
+                } else {
+                    messageDiv.innerHTML = `<span class="error">${data.message}</span>`;
+                }
+            } catch (error) {
+                messageDiv.innerHTML = `<span class="error">エラー: ${error.message}</span>`;
+            }
+        }
+
+        // ログアウト
+        async function logout() {
+            try {
+                await fetch('/api/admin/logout', {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+            } catch (error) {
+                console.error('ログアウトエラー:', error);
+            }
+
+            currentUser = null;
+            document.getElementById('login-section').classList.remove('hidden');
+            document.getElementById('main-section').classList.add('hidden');
+        }
+
+        // セクション切り替え
+        function showSection(section) {
+            currentSection = section;
+            document.getElementById('members-section').style.display = section === 'members' ? 'block' : 'none';
+            document.getElementById('audiences-section').style.display = section === 'audiences' ? 'block' : 'none';
+            document.getElementById('audience-members-section').style.display = section === 'audience-members' ? 'block' : 'none';
+            document.getElementById('events-section').style.display = section === 'events' ? 'block' : 'none';
+            document.getElementById('event-detail-section').style.display = section === 'event-detail' ? 'block' : 'none';
+
+            if (section === 'members') loadMembers();
+            if (section === 'audiences') loadAudiences();
+            if (section === 'audience-members') loadAudienceMembers();
+            if (section === 'events') loadEventsSection();
+            if (section === 'event-detail') loadEventDetail();
+        }
+
+        // 会員一覧読み込み
+        async function loadMembers() {
+            const role = document.getElementById('role-filter').value;
+            const params = role ? `?role=${role}` : '';
+
+            try {
+                const response = await fetch(`/api/admin/members${params}`, {
+                    credentials: 'include'
+                });
+
+                if (!response.ok) throw new Error('認証が必要です');
+
+                const data = await response.json();
+                const tbody = document.getElementById('members-tbody');
+                
+                tbody.innerHTML = data.items.map(member => `
+                    <tr>
+                        <td>${member.id}</td>
+                        <td>${member.name}</td>
+                        <td><span class="badge badge-${member.role}">${member.role}</span></td>
+                        <td><span class="badge badge-${member.line_user_id_present ? 'linked' : 'unlinked'}">${member.line_user_id_present ? '紐づけ済み' : '未紐づけ'}</span></td>
+                        <td>${member.is_target ? '○' : '×'}</td>
+                        <td>${member.display_order || '-'}</td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                console.error('会員一覧取得エラー:', error);
+            }
+        }
+
+        // audiences一覧読み込み
+        async function loadAudiences() {
+            try {
+                const response = await fetch('/api/admin/audiences', {
+                    credentials: 'include'
+                });
+
+                if (!response.ok) throw new Error('認証が必要です');
+
+                const data = await response.json();
+                const tbody = document.getElementById('audiences-tbody');
+                
+                tbody.innerHTML = data.items.map(audience => `
+                    <tr>
+                        <td>${audience.id}</td>
+                        <td>${audience.name}</td>
+                        <td>${audience.sort_order || '-'}</td>
+                        <td>${new Date(audience.created_at).toLocaleString('ja-JP')}</td>
+                        <td>
+                            <button onclick="manageAudienceMembers(${audience.id}, '${audience.name}')">メンバー管理</button>
+                            <button onclick="deleteAudience(${audience.id})" class="danger">削除</button>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                console.error('audiences一覧取得エラー:', error);
+            }
+        }
+
+        // audience作成
+        async function createAudience() {
+            const name = document.getElementById('audience-name').value;
+            const sort_order = document.getElementById('audience-sort').value;
+            const messageDiv = document.getElementById('audience-message');
+
+            if (!name) {
+                messageDiv.innerHTML = '<span class="error">名前は必須です</span>';
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/admin/audiences', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ 
+                        name, 
+                        sort_order: sort_order ? parseInt(sort_order) : undefined 
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    messageDiv.innerHTML = '<span class="success">作成完了</span>';
+                    document.getElementById('audience-name').value = '';
+                    document.getElementById('audience-sort').value = '';
+                    loadAudiences();
+                } else {
+                    messageDiv.innerHTML = `<span class="error">${data.message}</span>`;
+                }
+            } catch (error) {
+                messageDiv.innerHTML = `<span class="error">エラー: ${error.message}</span>`;
+            }
+        }
+
+        // audience削除
+        async function deleteAudience(id) {
+            if (!confirm('本当に削除しますか？')) return;
+
+            try {
+                const response = await fetch(`/api/admin/audiences/${id}`, {
+                    method: 'DELETE',
+                    credentials: 'include'
+                });
+
+                if (response.ok) {
+                    loadAudiences();
+                } else {
+                    alert('削除に失敗しました');
+                }
+            } catch (error) {
+                alert('エラーが発生しました');
+            }
+        }
+
+        // audienceメンバー管理画面を表示
+        function manageAudienceMembers(audienceId, audienceName) {
+            currentAudienceId = audienceId;
+            currentAudienceName = audienceName;
+            document.getElementById('current-audience-name').textContent = `${audienceName} (ID: ${audienceId})`;
+            showSection('audience-members');
+        }
+
+        // audienceメンバー一覧読み込み
+        async function loadAudienceMembers() {
+            if (!currentAudienceId) return;
+            
+            try {
+                // 現在の所属メンバーを取得
+                const currentResponse = await fetch(`/api/admin/audiences/${currentAudienceId}/members`, {
+                    credentials: 'include'
+                });
+                
+                if (!currentResponse.ok) throw new Error('認証が必要です');
+                
+                const currentData = await currentResponse.json();
+                
+                // 現在の所属メンバー表示
+                const currentDiv = document.getElementById('current-members');
+                if (currentData.items.length === 0) {
+                    currentDiv.innerHTML = '<p>所属メンバーはいません</p>';
+                } else {
+                    let html = '<table><thead><tr><th>名前</th><th>Role</th><th>LINE紐づけ</th></tr></thead><tbody>';
+                    currentData.items.forEach(member => {
+                        html += `<tr>
+                            <td>${member.name}</td>
+                            <td><span style="background: ${member.role === 'member' ? '#e3f2fd' : '#fff3e0'}; color: ${member.role === 'member' ? '#1976d2' : '#f57c00'}; padding: 2px 8px; border-radius: 12px; font-size: 12px;">${member.role}</span></td>
+                            <td><span style="background: ${member.line_user_id_present ? '#e8f5e8' : '#ffebee'}; color: ${member.line_user_id_present ? '#2e7d32' : '#d32f2f'}; padding: 2px 8px; border-radius: 12px; font-size: 12px;">${member.line_user_id_present ? '紐づけ済み' : '未紐づけ'}</span></td>
+                        </tr>`;
+                    });
+                    html += '</tbody></table>';
+                    currentDiv.innerHTML = html;
+                }
+                
+                // 全メンバー一覧を取得してチェックボックス表示
+                const allResponse = await fetch('/api/admin/members?role=member', {
+                    credentials: 'include'
+                });
+                
+                if (!allResponse.ok) throw new Error('認証が必要です');
+                
+                const allData = await allResponse.json();
+                const currentMemberIds = new Set(currentData.items.map(m => m.member_id));
+                
+                const selectionDiv = document.getElementById('member-selection');
+                let selectionHtml = '';
+                allData.items.forEach(member => {
+                    const isSelected = currentMemberIds.has(member.id);
+                    selectionHtml += `
+                        <div style="margin: 5px 0;">
+                            <label>
+                                <input type="checkbox" name="member-checkbox" value="${member.id}" ${isSelected ? 'checked' : ''}>
+                                ${member.name} (${member.role}) ${member.line_user_id_present ? '✓' : '✗'}
+                            </label>
+                        </div>
+                    `;
+                });
+                selectionDiv.innerHTML = selectionHtml;
+                
+            } catch (error) {
+                document.getElementById('current-members').innerHTML = `<div class="error">エラー: ${error.message}</div>`;
+                document.getElementById('member-selection').innerHTML = `<div class="error">エラー: ${error.message}</div>`;
+            }
+        }
+
+        // audienceメンバー保存
+        async function saveAudienceMembers() {
+            if (!currentAudienceId) return;
+            
+            const checkboxes = document.querySelectorAll('input[name="member-checkbox"]:checked');
+            const memberIds = Array.from(checkboxes).map(cb => parseInt(cb.value));
+            const messageDiv = document.getElementById('member-save-message');
+            
+            try {
+                const response = await fetch(`/api/admin/audiences/${currentAudienceId}/members`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ member_ids: memberIds })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    messageDiv.innerHTML = `<div class="success">保存完了: ${data.count}名を割り当てました</div>`;
+                    loadAudienceMembers(); // 画面を更新
+                } else {
+                    messageDiv.innerHTML = `<div class="error">保存失敗: ${data.message}</div>`;
+                }
+            } catch (error) {
+                messageDiv.innerHTML = `<div class="error">エラー: ${error.message}</div>`;
+            }
+        }
+
+        // ===== イベント管理関数 =====
+
+        // イベントセクション初期化
+        async function loadEventsSection() {
+            await loadEvents();
+            await loadAudiencesForEvents();
+            await loadMembersForEvents();
+            initializeEventForm();
+        }
+
+        // イベント一覧読み込み
+        async function loadEvents() {
+            const listDiv = document.getElementById('events-list');
+            
+            try {
+                const response = await fetch('/api/admin/events', {
+                    credentials: 'include'
+                });
+                
+                if (!response.ok) throw new Error('認証が必要です');
+                
+                const data = await response.json();
+                
+                if (data.items.length === 0) {
+                    listDiv.innerHTML = '<p>イベントはありません</p>';
+                } else {
+                    let html = '<table><thead><tr><th>ID</th><th>タイトル</th><th>開催日時</th><th>対象者数</th><th>作成日時</th><th>操作</th></tr></thead><tbody>';
+                    data.items.forEach(event => {
+                        const heldAt = new Date(event.held_at).toLocaleString('ja-JP');
+                        const createdAt = new Date(event.created_at).toLocaleString('ja-JP');
+                        html += `<tr>
+                            <td>${event.id}</td>
+                            <td>${event.title}</td>
+                            <td>${heldAt}</td>
+                            <td>${event.target_count}名</td>
+                            <td>${createdAt}</td>
+                            <td>
+                                <button onclick="showEventDetail(${event.id}, '${event.title}')">詳細</button>
+                            </td>
+                        </tr>`;
+                    });
+                    html += '</tbody></table>';
+                    listDiv.innerHTML = html;
+                }
+            } catch (error) {
+                listDiv.innerHTML = `<div class="error">エラー: ${error.message}</div>`;
+            }
+        }
+
+        // audiences データ読み込み（イベント用）
+        async function loadAudiencesForEvents() {
+            try {
+                const response = await fetch('/api/admin/audiences', {
+                    credentials: 'include'
+                });
+                
+                if (!response.ok) return;
+                
+                const data = await response.json();
+                audiencesData = data.items;
+                
+                const checkboxDiv = document.getElementById('audience-checkboxes');
+                let html = '';
+                audiencesData.forEach(audience => {
+                    html += `
+                        <div style="margin: 5px 0;">
+                            <label>
+                                <input type="checkbox" name="audience-checkbox" value="${audience.id}" onchange="updateTargetPreview()">
+                                ${audience.name}
+                            </label>
+                        </div>
+                    `;
+                });
+                checkboxDiv.innerHTML = html;
+            } catch (error) {
+                console.error('Audiences読み込みエラー:', error);
+            }
+        }
+
+        // 全メンバー読み込み（イベント用）
+        async function loadMembersForEvents() {
+            try {
+                const response = await fetch('/api/admin/members?role=member', {
+                    credentials: 'include'
+                });
+                
+                if (!response.ok) return;
+                
+                const data = await response.json();
+                allMembers = data.items;
+            } catch (error) {
+                console.error('Members読み込みエラー:', error);
+            }
+        }
+
+        // 全員チェックボックスの切り替え
+        function toggleAllMembers() {
+            const selectAll = document.getElementById('select-all-members');
+            const audienceCheckboxes = document.querySelectorAll('input[name="audience-checkbox"]');
+            
+            audienceCheckboxes.forEach(checkbox => {
+                checkbox.checked = selectAll.checked;
+            });
+            
+            updateTargetPreview();
+        }
+
+        // 受信者プレビュー更新
+        async function updateTargetPreview() {
+            const previewDiv = document.getElementById('target-preview');
+            const selectAll = document.getElementById('select-all-members');
+            const checkedAudiences = document.querySelectorAll('input[name="audience-checkbox"]:checked');
+            
+            if (selectAll.checked) {
+                previewDiv.innerHTML = `<p><strong>全員: ${allMembers.length}名</strong></p>`;
+                return;
+            }
+            
+            if (checkedAudiences.length === 0) {
+                previewDiv.innerHTML = '<p>配信対象を選択してください</p>';
+                return;
+            }
+            
+            try {
+                // 選択されたaudienceのメンバーを取得
+                const selectedAudienceIds = Array.from(checkedAudiences).map(cb => parseInt(cb.value));
+                let targetMemberIds = new Set();
+                
+                for (const audienceId of selectedAudienceIds) {
+                    const response = await fetch(`/api/admin/audiences/${audienceId}/members`, {
+                        credentials: 'include'
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        data.items.forEach(member => targetMemberIds.add(member.member_id));
+                    }
+                }
+                
+                const targetMembers = allMembers.filter(member => targetMemberIds.has(member.id));
+                targetMembers.sort((a, b) => (a.display_order || 999) - (b.display_order || 999));
+                
+                let html = `<p><strong>対象: ${targetMembers.length}名</strong></p>`;
+                html += '<div style="max-height: 150px; overflow-y: auto; border: 1px solid #ddd; padding: 5px;">';
+                targetMembers.forEach(member => {
+                    html += `<div>${member.name} (${member.role})</div>`;
+                });
+                html += '</div>';
+                
+                previewDiv.innerHTML = html;
+            } catch (error) {
+                previewDiv.innerHTML = `<div class="error">プレビュー取得エラー: ${error.message}</div>`;
+            }
+        }
+
+        // イベントフォーム初期化
+        function initializeEventForm() {
+            // 追加メモ欄の表示/非表示制御
+            document.getElementById('extra-text-enabled').addEventListener('change', function() {
+                const options = document.getElementById('extra-text-options');
+                options.classList.toggle('hidden', !this.checked);
+            });
+            
+            // フォーム送信処理
+            const form = document.getElementById('event-form');
+            if (form) {
+                form.addEventListener('submit', async function(e) {
+                    e.preventDefault();
+                    await createEvent();
+                });
+            }
+        }
+
+        // イベント作成処理
+        async function createEvent() {
+            const messageDiv = document.getElementById('event-create-message');
+            const form = document.getElementById('event-form');
+            const formData = new FormData();
+            
+            // 基本項目の追加
+            formData.append('title', document.getElementById('event-title').value);
+            formData.append('body', document.getElementById('event-body').value);
+            
+            const imageFile = document.getElementById('event-image').files[0];
+            if (imageFile) {
+                formData.append('image', imageFile);
+            }
+            
+            formData.append('extra_text_label', document.getElementById('extra-text-label').value);
+            
+            // 対象メンバーIDsを取得
+            const selectAll = document.getElementById('select-all-members');
+            let targetMemberIds = [];
+            
+            if (selectAll.checked) {
+                targetMemberIds = allMembers.map(m => m.id);
+            } else {
+                const checkedAudiences = document.querySelectorAll('input[name="audience-checkbox"]:checked');
+                const selectedAudienceIds = Array.from(checkedAudiences).map(cb => parseInt(cb.value));
+                
+                if (selectedAudienceIds.length === 0) {
+                    messageDiv.innerHTML = '<div class="error">配信対象を選択してください</div>';
+                    return;
+                }
+                
+                // 選択されたaudienceのメンバーを取得
+                const targetMemberIdsSet = new Set();
+                for (const audienceId of selectedAudienceIds) {
+                    try {
+                        const response = await fetch(`/api/admin/audiences/${audienceId}/members`, {
+                            credentials: 'include'
+                        });
+                        
+                        if (response.ok) {
+                            const data = await response.json();
+                            data.items.forEach(member => targetMemberIdsSet.add(member.member_id));
+                        }
+                    } catch (error) {
+                        console.error('Audience members取得エラー:', error);
+                    }
+                }
+                
+                targetMemberIds = Array.from(targetMemberIdsSet);
+            }
+            
+            if (targetMemberIds.length === 0) {
+                messageDiv.innerHTML = '<div class="error">対象メンバーが見つかりません</div>';
+                return;
+            }
+            
+            formData.append('target_member_ids', JSON.stringify(targetMemberIds));
+            
+            // datetime-localの値をISO8601形式に変換
+            const heldAtInput = document.getElementById('event-held-at');
+            if (heldAtInput.value) {
+                const localDateTime = new Date(heldAtInput.value);
+                const jstDateTime = new Date(localDateTime.getTime() - localDateTime.getTimezoneOffset() * 60000);
+                const iso8601 = jstDateTime.toISOString().slice(0, 19) + '+09:00';
+                formData.append('held_at', iso8601);
+            }
+            
+            // チェックボックスの値を明示的にboolean文字列で追加
+            const extraTextEnabled = document.getElementById('extra-text-enabled').checked;
+            const extraTextAttendOnly = document.getElementById('extra-text-attend-only').checked;
+            formData.append('extra_text_enabled', extraTextEnabled ? 'true' : 'false');
+            formData.append('extra_text_attend_only', extraTextAttendOnly ? 'true' : 'false');
+            
+            messageDiv.innerHTML = '<div>作成中...</div>';
+            
+            try {
+                const response = await fetch('/api/admin/events', {
+                    method: 'POST',
+                    credentials: 'include',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    messageDiv.innerHTML = `<div class="success">イベント作成成功！<br>イベントID: ${data.event_id}<br>対象者: ${data.targets}名<br>送信: 成功${data.push.success}件、失敗${data.push.fail}件</div>`;
+                    form.reset();
+                    document.getElementById('extra-text-options').classList.add('hidden');
+                    document.getElementById('target-preview').innerHTML = '配信対象を選択してください';
+                    loadEvents(); // 一覧を更新
+                } else {
+                    let errorMsg = `<div class="error">作成失敗: ${data.message}`;
+                    if (data.details) {
+                        console.error('[ERROR] イベント作成バリデーションエラー:', data.details);
+                        errorMsg += '<br><br>詳細:<br>' + data.details.map(d => `• ${d.msg} (${d.param})`).join('<br>');
+                    }
+                    errorMsg += '</div>';
+                    messageDiv.innerHTML = errorMsg;
+                }
+            } catch (error) {
+                messageDiv.innerHTML = `<div class="error">エラー: ${error.message}</div>`;
+            }
+        }
+
+        // ===== イベント詳細関数 =====
+
+        // イベント詳細表示（詳細ボタンから呼ばれる）
+        function showEventDetail(eventId, eventTitle) {
+            currentEventId = eventId;
+            currentEventTitle = eventTitle;
+            showSection('event-detail');
+        }
+
+        // イベント詳細データ読み込み
+        async function loadEventDetail() {
+            if (!currentEventId) return;
+            
+            const contentDiv = document.getElementById('event-detail-content');
+            contentDiv.innerHTML = '読み込み中...';
+            
+            try {
+                const response = await fetch(`/api/admin/events/${currentEventId}`, {
+                    credentials: 'include'
+                });
+                
+                if (!response.ok) throw new Error('認証が必要です');
+                
+                const event = await response.json();
+                
+                // 基本情報表示
+                const basicInfoDiv = document.getElementById('event-basic-info');
+                const heldAt = new Date(event.held_at).toLocaleString('ja-JP');
+                basicInfoDiv.innerHTML = `
+                    <p><strong>タイトル:</strong> ${event.title}</p>
+                    <p><strong>開催日時:</strong> ${heldAt}</p>
+                    <p><strong>本文:</strong></p>
+                    <div style="white-space: pre-wrap; background: #f8f9fa; padding: 10px; border-radius: 4px;">${event.body || '-'}</div>
+                    <p><strong>追加メモ欄:</strong> ${event.extra_text.enabled ? `有効（${event.extra_text.label}${event.extra_text.attend_only ? ', 出席時のみ表示' : ''}）` : '無効'}</p>
+                `;
+                
+                // 送信要約表示
+                const pushSummaryDiv = document.getElementById('event-push-summary');
+                const lastSent = event.push_stats.last_sent_at ? new Date(event.push_stats.last_sent_at).toLocaleString('ja-JP') : '未送信';
+                pushSummaryDiv.innerHTML = `
+                    <p><strong>送信結果:</strong> 成功 ${event.push_stats.success_count}件 / 失敗 ${event.push_stats.fail_count}件 / 合計 ${event.push_stats.total_count}件</p>
+                    <p><strong>最終送信日時:</strong> ${lastSent}</p>
+                `;
+                
+                // 画像表示
+                const imageDisplayDiv = document.getElementById('event-image-display');
+                if (event.image_preview_url) {
+                    imageDisplayDiv.innerHTML = `
+                        <div>
+                            <img src="${event.image_preview_url}" style="max-width: 100%; height: auto; border: 1px solid #ddd; border-radius: 4px;">
+                            <p><a href="${event.image_url}" target="_blank">全画面で開く（オリジナル）</a></p>
+                        </div>
+                    `;
+                } else {
+                    imageDisplayDiv.innerHTML = '<p>画像なし</p>';
+                }
+                
+                // 出欠状況表示
+                displayAttendanceStatus(event.current_status, event.can_proxy_respond);
+                
+                contentDiv.innerHTML = '読み込み完了';
+                
+            } catch (error) {
+                contentDiv.innerHTML = `<div class="error">エラー: ${error.message}</div>`;
+            }
+        }
+
+        // 出欠状況表示
+        function displayAttendanceStatus(statusData, canProxyRespond = false) {
+            const summaryDiv = document.getElementById('event-attendance-summary');
+            const listDiv = document.getElementById('event-attendance-list');
+            
+            // 集計
+            const attendCount = statusData.filter(s => s.status === 'attend').length;
+            const absentCount = statusData.filter(s => s.status === 'absent').length;
+            const pendingCount = statusData.filter(s => s.status === 'pending').length;
+            
+            summaryDiv.innerHTML = `
+                <p><strong>出席:</strong> ${attendCount}名 / <strong>欠席:</strong> ${absentCount}名 / <strong>未回答:</strong> ${pendingCount}名 / <strong>合計:</strong> ${statusData.length}名</p>
+            `;
+            
+            // 一覧
+            if (statusData.length === 0) {
+                listDiv.innerHTML = '<p>対象者がいません</p>';
+            } else {
+                const headerCols = canProxyRespond 
+                    ? '<th>名前</th><th>出欠</th><th>メモ</th><th>回答日時</th><th>代理回答</th>'
+                    : '<th>名前</th><th>出欠</th><th>メモ</th><th>回答日時</th>';
+                
+                let html = `<table style="width: 100%; border-collapse: collapse;"><thead><tr>${headerCols}</tr></thead><tbody>`;
+                statusData.forEach(member => {
+                    const statusText = member.status === 'attend' ? '出席' : member.status === 'absent' ? '欠席' : '未回答';
+                    const statusColor = member.status === 'attend' ? '#28a745' : member.status === 'absent' ? '#dc3545' : '#6c757d';
+                    const respondedAt = member.responded_at ? new Date(member.responded_at).toLocaleString('ja-JP') : '-';
+                    
+                    // LINE登録状況の絵文字
+                    const lineStatusEmoji = member.is_target ? '🟢' : '⚪';
+                    
+                    // 代理回答マーカー（✏️）
+                    const proxyMarker = member.via === 'admin' ? ' ✏️' : '';
+                    
+                    const proxyButtons = canProxyRespond 
+                        ? `<td>
+                            <button onclick="proxyRespond(${member.member_id}, '${member.name}', 'attend')" style="background: #28a745; color: white; padding: 4px 8px; margin-right: 4px; border: none; border-radius: 3px; font-size: 12px;">出席代理</button>
+                            <button onclick="proxyRespond(${member.member_id}, '${member.name}', 'absent')" style="background: #dc3545; color: white; padding: 4px 8px; border: none; border-radius: 3px; font-size: 12px;">欠席代理</button>
+                           </td>`
+                        : '';
+                    
+                    html += `<tr>
+                        <td>${lineStatusEmoji} ${member.name}</td>
+                        <td><span style="color: ${statusColor}; font-weight: bold;">${statusText}</span>${proxyMarker}</td>
+                        <td>${member.extra_text || '-'}</td>
+                        <td>${respondedAt}</td>
+                        ${proxyButtons}
+                    </tr>`;
+                });
+                html += '</tbody></table>';
+                
+                // 凡例を追加
+                html += `<div style="margin-top: 15px; padding: 10px; background-color: #f8f9fa; border-radius: 4px; font-size: 12px; color: #6c757d;">
+                    <strong>凡例:</strong> 🟢：公式LINE登録済み　⚪：公式LINE未登録　✏️：代理回答
+                </div>`;
+                
+                listDiv.innerHTML = html;
+            }
+        }
+
+        // CSV ダウンロード
+        function downloadCSV(type) {
+            if (!currentEventId) return;
+            
+            const url = type === 'latest' 
+                ? `/api/admin/events/${currentEventId}/export/latest.csv`
+                : `/api/admin/events/${currentEventId}/export/history.csv`;
+                
+            // 認証付きダウンロード
+            fetch(url, {
+                credentials: 'include'
+            })
+            .then(response => {
+                if (!response.ok) throw new Error('ダウンロードに失敗しました');
+                return response.blob();
+            })
+            .then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = type === 'latest' 
+                    ? `event_${currentEventId}_latest.csv`
+                    : `event_${currentEventId}_history.csv`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            })
+            .catch(error => {
+                alert(`CSV ダウンロードエラー: ${error.message}`);
+            });
+        }
+
+        // ===== 代理回答機能 =====
+
+        // 代理回答実行
+        async function proxyRespond(memberId, memberName, status) {
+            const statusText = status === 'attend' ? '出席' : '欠席';
+            
+            // 確認ダイアログ
+            if (!confirm(`${memberName}さんの代理で「${statusText}」を登録しますか？`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/admin/events/${currentEventId}/proxy-response`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        member_id: memberId,
+                        status: status,
+                        extra_text: '' // 今回は簡易実装でテキストなし
+                    })
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || '代理回答に失敗しました');
+                }
+                
+                // 成功時は詳細を再読み込み
+                await loadEventDetail();
+                alert(`${memberName}さんの代理回答（${statusText}）を登録しました。`);
+                
+            } catch (error) {
+                alert(`代理回答エラー: ${error.message}`);
+            }
+        }
+    </script>
+</body>
+</html>

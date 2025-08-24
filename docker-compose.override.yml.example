@@ -1,0 +1,38 @@
+# 開発環境用のオーバーライド設定
+# 使用方法: cp docker-compose.override.yml.example docker-compose.override.yml
+
+version: '3.8'
+
+services:
+  api-server:
+    # 開発用bind mount（即時反映）
+    volumes:
+      - ./services/api-server/public:/app/public
+      - ./services/api-server/src:/app/src        # 開発用：srcも即時反映
+    
+    # 開発用環境変数
+    environment:
+      - NODE_ENV=development
+      - DEV_ALLOW_INSECURE=1                      # 署名検証無効
+      - LOG_LEVEL=DEBUG                           # デバッグログ有効
+      - DEV_PUSH_DISABLE=1                        # LINE送信無効（ドライラン）
+    
+    # ホットリロード対応
+    command: npm run dev
+    
+    # 依存関係を最小化（開発時はCaddy不要）
+    depends_on:
+      - redis
+      # caddyは開発時不要
+    
+    # 開発用ポート直接公開
+    ports:
+      - "4000:4000"
+  
+  # Caddyは開発時はプロファイル制御
+  caddy:
+    profiles: ["production"]  # 通常は起動しない
+    
+  # 開発用サービス（必要に応じて）
+  # mailhog:  # メール送信テスト用
+  #   profiles: ["dev-tools"]

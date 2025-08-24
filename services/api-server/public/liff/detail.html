@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>イベント詳細 - RC公式LINE</title>
+    <link rel="stylesheet" href="common.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📅 イベント詳細</h1>
+        </div>
+
+        <!-- ナビゲーション -->
+        <div class="nav">
+            <a href="index.html" class="nav-button">← 一覧</a>
+        </div>
+
+        <!-- メインコンテンツ -->
+        <div id="main-content">
+            <!-- ローディング表示 -->
+            <div class="loading">
+                <div class="spinner"></div>
+                <div>イベント情報を読み込み中...</div>
+            </div>
+        </div>
+
+        <!-- ユーザー情報（開発用） -->
+        <div id="dev-info" class="d-none"></div>
+    </div>
+
+    <script src="common.js"></script>
+    <script>
+        // イベントデータ
+        let currentUser = null;
+        let eventData = null;
+        let eventId = null;
+
+        // ページ初期化
+        async function initPage() {
+            try {
+                // URLパラメータからイベントIDを取得
+                eventId = getUrlParameter('id');
+                if (!eventId) {
+                    showError('main-content', 'イベントIDが指定されていません。');
+                    return;
+                }
+
+                // ユーザー情報取得
+                currentUser = await getCurrentUser();
+                if (!currentUser) {
+                    showError('main-content', '認証に失敗しました。LINEから再度アクセスしてください。');
+                    return;
+                }
+
+                // 開発環境でのユーザー情報表示
+                if (CONFIG.isDev) {
+                    const devInfo = document.getElementById('dev-info');
+                    devInfo.classList.remove('d-none');
+                    devInfo.innerHTML = `
+                        <div class="message message-info">
+                            <strong>開発モード:</strong> ${currentUser.name || 'テストユーザー'} (ID: ${currentUser.member_id || 'N/A'})
+                            <br><strong>イベントID:</strong> ${eventId}
+                        </div>
+                    `;
+                }
+
+                // イベント詳細読み込み
+                await loadEventDetail();
+
+            } catch (error) {
+                console.error('ページ初期化エラー:', error);
+                showError('main-content', 'ページの読み込みに失敗しました。');
+            }
+        }
+
+        // イベント詳細読み込み
+        async function loadEventDetail() {
+            try {
+                showLoading('main-content');
+                
+                const response = await apiRequest(`/api/liff/events/${eventId}`);
+                eventData = await response.json();
+                
+                displayEventDetail(eventData);
+                
+            } catch (error) {
+                console.error('イベント詳細読み込みエラー:', error);
+                
+                if (error.message.includes('403')) {
+                    showError('main-content', 'このイベントにアクセスする権限がありません。');
+                } else {
+                    showError('main-content', 'イベント詳細の読み込みに失敗しました。');
+                }
+            }
+        }
+
+        // イベント詳細表示
+        function displayEventDetail(event) {
+            const container = document.getElementById('main-content');
+            
+            // 現在時刻と開催日時の比較
+            const now = new Date();
+            const heldAt = new Date(event.held_at);
+            const isPastEvent = now > heldAt;
+            
+            // 現在の回答状況
+            const currentResponse = event.my_response || {};
+            const hasResponse = currentResponse.status;
+            const isAttend = currentResponse.status === 'attend';
+            const isAbsent = currentResponse.status === 'absent';
+            
+            // アクセス権・対象者確認（仮定：can_respondがfalseなら対象外）
+            const isTarget = event.can_respond;
+            
+            // 基本情報表示
+            let html = `
+                <div class="card">
+                    <div class="card-body">
+                        <!-- 1. タイトル -->
+                        <h2 class="event-title">${escapeHtml(event.title)}</h2>
+                        
+                        <!-- 2. 日時 -->
+                        <div class="event-date mb-2">
+                            📅 ${formatDate(event.held_at)} ${formatTime(event.held_at)}
+                        </div>
+                        
+                        <!-- 3. 画像表示 -->
+                        ${event.image_preview_url ? `
+                            <div class="mb-3">
+                                <img src="${escapeHtml(event.image_preview_url)}" 
+                                     alt="イベント画像" 
+                                     style="width: 100%; border-radius: 6px; cursor: pointer;"
+                                     onclick="showFullImage('${escapeHtml(event.image_url)}')">
+                                ${event.image_url ? '<p class="text-center mt-2"><small>🔍 タップで全画面表示</small></p>' : ''}
+                            </div>
+                        ` : ''}
+                        
+                        <!-- 4. コメント -->
+                        ${event.body ? `<div class="event-description mb-3">${escapeHtml(event.body)}</div>` : ''}
+                        
+                        <!-- 5. 現在の回答状況 -->
+                        ${hasResponse ? `
+                            <div class="mb-3 message message-info">
+                                現在の回答: <strong>${getStatusText(currentResponse.status)}</strong>
+                                ${currentResponse.responded_at ? `<br><small>回答日時: ${formatDateTime(currentResponse.responded_at)}</small>` : ''}
+                            </div>
+                        ` : ''}
+                        
+                        <!-- 6. 出欠回答セクション -->
+                        <h3>🗳️ 出欠回答</h3>
+                        
+                        <!-- 7. 追加テキスト入力（ボタンの上に配置） -->
+                        ${event.extra_text_enabled ? `
+                            <div class="mt-3" id="extra-text-section" ${event.extra_text_attend_only && !isAttend ? 'style="display: none;"' : ''}>
+                                <label for="extra-text">${escapeHtml(event.extra_text_label || '追加メモ')}</label>
+                                <textarea id="extra-text" rows="3" placeholder="メモがあればご記入ください">${escapeHtml(currentResponse.extra_text || '')}</textarea>
+                            </div>
+                        ` : ''}
+                        
+                        <!-- 8. ボタン（横並び） -->
+                        <div class="mt-3 d-flex" style="gap: 10px;">
+                            <button onclick="submitResponse('attend')" 
+                                    id="attend-button"
+                                    class="button button-primary" 
+                                    style="flex: 1; ${getButtonStyle('attend', isTarget, isPastEvent, isAttend, isAbsent)}">
+                                ✅ 出席
+                            </button>
+                            <button onclick="submitResponse('absent')" 
+                                    id="absent-button"
+                                    class="button button-secondary" 
+                                    style="flex: 1; ${getButtonStyle('absent', isTarget, isPastEvent, isAttend, isAbsent)}">
+                                ❌ 欠席
+                            </button>
+                        </div>
+                        
+                        <!-- 9. ボタン無効化の理由表示 -->
+                        ${getButtonDisabledMessage(isTarget, isPastEvent)}
+                        
+                    </div>
+                </div>
+            `;
+
+            // 出欠状況一覧（折りたたみ）
+            if (event.attendance_status && event.attendance_status.length > 0) {
+                html += `
+                    <div class="collapsible">
+                        <div class="collapsible-header">
+                            <span>👥 出欠状況一覧 (${event.attendance_status.length}名)</span>
+                            <span class="collapse-icon">▼</span>
+                        </div>
+                        <div class="collapsible-content">
+                            <div class="status-list">
+                                ${event.attendance_status.map(member => {
+                                    const lineStatusEmoji = member.is_target ? '🟢' : '⚪';
+                                    const statusText = getStatusText(member.status);
+                                    const statusClass = getStatusClass(member.status);
+                                    const proxyMarker = member.via === 'admin' ? ' ✏️' : '';
+                                    
+                                    return `
+                                        <div class="member-row">
+                                            <div class="member-name">${lineStatusEmoji} ${escapeHtml(member.name)}</div>
+                                            <div class="member-status ${statusClass}">
+                                                ${statusText}${proxyMarker}
+                                            </div>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // 回答履歴（折りたたみ）
+            if (event.response_history && event.response_history.length > 0) {
+                html += `
+                    <div class="collapsible">
+                        <div class="collapsible-header">
+                            <span>📝 回答履歴 (${event.response_history.length}件)</span>
+                            <span class="collapse-icon">▼</span>
+                        </div>
+                        <div class="collapsible-content">
+                            <div class="history-list">
+                                ${event.response_history.map(history => {
+                                    const statusText = getStatusText(history.status);
+                                    const statusClass = getStatusClass(history.status);
+                                    const proxyMarker = history.via === 'admin' ? ' ✏️' : '';
+                                    
+                                    return `
+                                        <div class="member-row">
+                                            <div class="member-name">
+                                                ${formatDateTime(history.responded_at)}<br>
+                                                <small>${escapeHtml(history.name)}</small>
+                                            </div>
+                                            <div class="member-status ${statusClass}">
+                                                ${statusText}${proxyMarker}
+                                                ${history.extra_text ? `<br><small>${escapeHtml(history.extra_text)}</small>` : ''}
+                                            </div>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // 凡例
+            html += `
+                <div class="legend">
+                    <div class="legend-title">凡例</div>
+                    <div>🟢：公式LINE登録済み　⚪：公式LINE未登録　✏️：代理回答</div>
+                </div>
+            `;
+
+            container.innerHTML = html;
+            
+            // 折りたたみ機能を再初期化
+            initCollapsible();
+        }
+
+        // ボタンスタイル制御
+        function getButtonStyle(buttonType, isTarget, isPastEvent, isAttend, isAbsent) {
+            // 優先度順で条件チェック
+            if (!isTarget) {
+                return 'opacity: 0.4; cursor: not-allowed; pointer-events: none;';
+            }
+            
+            if (isPastEvent) {
+                return 'opacity: 0.4; cursor: not-allowed; pointer-events: none;';
+            }
+            
+            if ((buttonType === 'attend' && isAttend) || (buttonType === 'absent' && isAbsent)) {
+                return 'opacity: 0.6; cursor: not-allowed; pointer-events: none;';
+            }
+            
+            return '';
+        }
+
+        // ボタン無効化メッセージ
+        function getButtonDisabledMessage(isTarget, isPastEvent) {
+            if (!isTarget) {
+                return `<div class="mt-2 message message-error"><small>このイベントの対象者ではありません。</small></div>`;
+            }
+            
+            if (isPastEvent) {
+                return `<div class="mt-2 message message-error"><small>開催日時が過ぎているため、回答できません。</small></div>`;
+            }
+            
+            return '';
+        }
+
+        // 出欠回答送信
+        async function submitResponse(status) {
+            if (!eventId) return;
+
+            // ボタン状態確認（念のため）
+            const button = document.getElementById(status === 'attend' ? 'attend-button' : 'absent-button');
+            if (button && button.style.pointerEvents === 'none') {
+                return; // 無効化されたボタンなので処理しない
+            }
+
+            try {
+                const extraText = eventData?.extra_text_enabled 
+                    ? document.getElementById('extra-text')?.value || ''
+                    : '';
+
+                const response = await apiRequest(`/api/liff/events/${eventId}/response`, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        status: status,
+                        extra_text: extraText
+                    })
+                });
+
+                // 成功メッセージ表示
+                const statusText = getStatusText(status);
+                showSuccess('response-message', `${statusText}で回答しました。`);
+                
+                // イベント詳細を再読み込み
+                setTimeout(() => {
+                    loadEventDetail();
+                }, 1000);
+
+            } catch (error) {
+                console.error('回答送信エラー:', error);
+                showError('response-message', '回答の送信に失敗しました。');
+            }
+        }
+
+        // 全画面画像表示
+        function showFullImage(imageUrl) {
+            if (!imageUrl) return;
+            
+            const overlay = document.createElement('div');
+            overlay.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0,0,0,0.9);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 1000;
+                cursor: pointer;
+            `;
+            
+            const img = document.createElement('img');
+            img.src = imageUrl;
+            img.style.cssText = `
+                max-width: 95%;
+                max-height: 95%;
+                object-fit: contain;
+            `;
+            
+            overlay.appendChild(img);
+            overlay.onclick = () => document.body.removeChild(overlay);
+            
+            document.body.appendChild(overlay);
+        }
+
+        // HTMLエスケープ
+        function escapeHtml(unsafe) {
+            if (!unsafe) return '';
+            return unsafe
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        // ページ読み込み時実行
+        document.addEventListener('DOMContentLoaded', initPage);
+    </script>
+
+    <!-- 回答メッセージ表示エリア -->
+    <div id="response-message"></div>
+
+    <style>
+        /* 追加スタイル */
+        .selected {
+            opacity: 0.8;
+            transform: scale(0.98);
+        }
+        
+        .history-list .member-row {
+            border-bottom: 1px solid #e9ecef;
+            padding: 12px 0;
+        }
+        
+        .history-list .member-row:last-child {
+            border-bottom: none;
+        }
+        
+        .event-description {
+            line-height: 1.6;
+            color: #495057;
+        }
+    </style>
+</body>
+</html>

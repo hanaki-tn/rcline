@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import session from 'express-session';
 import rateLimit from 'express-rate-limit';
+import flash from 'connect-flash';
 import { createDatabase } from './database.js';
 import { createQueue } from './queue.js';
 import { adminRoutes } from './routes/admin.js';
@@ -13,7 +14,17 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 
 // ミドルウェア
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"], // デモページ用にインラインスクリプトを許可
+      scriptSrcAttr: ["'unsafe-inline'"], // デモページ用にインラインイベントハンドラーを許可
+      imgSrc: ["'self'", "data:"]
+    }
+  }
+}));
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -37,6 +48,9 @@ app.use(session({
   }
 }));
 
+// Flash メッセージ
+app.use(flash());
+
 // データベース初期化
 const db = createDatabase();
 global.db = db; // プロセッサーからアクセス用
@@ -51,10 +65,18 @@ app.use((req, res, next) => {
   next();
 });
 
+// 静的ファイル配信
+app.use('/admin', express.static('public'));
+app.use('/liff', express.static('public/liff'));
+
+// ファイル配信（イベント画像等）
+app.use('/files', express.static('files'));
+
 // ルーティング
 app.use('/api/admin', adminRoutes);
 app.use('/api/liff', liffRoutes);
 app.use('/api/line', lineRoutes);
+
 
 // ヘルスチェック
 app.get('/health', (req, res) => {
@@ -80,4 +102,8 @@ app.use((req, res) => {
 
 app.listen(PORT, () => {
   console.log(`RC LINE API Server running on port ${PORT}`);
+  console.log('Routes configured:');
+  console.log('- /api/admin');
+  console.log('- /api/liff');
+  console.log('- /api/line');
 });

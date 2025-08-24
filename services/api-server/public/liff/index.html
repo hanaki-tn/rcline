@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>イベント一覧 - RC公式LINE</title>
+    <link rel="stylesheet" href="common.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📅 イベント一覧</h1>
+        </div>
+
+        <!-- ナビゲーション -->
+        <div class="nav" style="display: none;">
+            <!-- ナビゲーションボタンは不要のため非表示 -->
+        </div>
+
+        <!-- メインコンテンツ -->
+        <div id="main-content">
+            <!-- ローディング表示 -->
+            <div class="loading">
+                <div class="spinner"></div>
+                <div>イベント情報を読み込み中...</div>
+            </div>
+        </div>
+
+        <!-- ユーザー情報（開発用） -->
+        <div id="dev-info" class="d-none"></div>
+    </div>
+
+    <script src="common.js"></script>
+    <script>
+        // イベント一覧データ
+        let currentUser = null;
+        let events = [];
+
+        // ページ初期化
+        async function initPage() {
+            try {
+                // ユーザー情報取得
+                currentUser = await getCurrentUser();
+                if (!currentUser) {
+                    showError('main-content', '認証に失敗しました。LINEから再度アクセスしてください。');
+                    return;
+                }
+
+                // 開発環境でのユーザー情報表示
+                if (CONFIG.isDev) {
+                    const devInfo = document.getElementById('dev-info');
+                    devInfo.classList.remove('d-none');
+                    devInfo.innerHTML = `
+                        <div class="message message-info">
+                            <strong>開発モード:</strong> ${currentUser.name || 'テストユーザー'} (ID: ${currentUser.member_id || 'N/A'})
+                        </div>
+                    `;
+                }
+
+                // イベント一覧読み込み
+                await loadEvents();
+
+            } catch (error) {
+                console.error('ページ初期化エラー:', error);
+                showError('main-content', 'ページの読み込みに失敗しました。');
+            }
+        }
+
+        // イベント一覧読み込み
+        async function loadEvents() {
+            try {
+                showLoading('main-content');
+                
+                const response = await apiRequest('/api/liff/events');
+                events = await response.json();
+                
+                displayEvents(events);
+                
+            } catch (error) {
+                console.error('イベント読み込みエラー:', error);
+                showError('main-content', 'イベント一覧の読み込みに失敗しました。');
+            }
+        }
+
+        // イベント一覧表示
+        function displayEvents(eventList) {
+            const container = document.getElementById('main-content');
+            
+            if (!eventList || eventList.length === 0) {
+                showEmptyState('main-content', '現在、表示できるイベントはありません。', '📅');
+                return;
+            }
+
+            let html = '<div class="event-list">';
+            
+            eventList.forEach(event => {
+                const statusClass = getStatusClass(event.my_response?.status || 'pending');
+                const statusText = getStatusText(event.my_response?.status || 'pending');
+                
+                // 開催日時の表示
+                const eventDate = formatDate(event.held_at);
+                const eventTime = formatTime(event.held_at);
+                
+                html += `
+                    <a href="detail.html?id=${event.id}" class="event-item">
+                        <div class="event-title">${escapeHtml(event.title)}</div>
+                        <div class="event-date">📅 ${eventDate} ${eventTime}</div>
+                        <div class="event-status ${statusClass}">
+                            回答状況: ${statusText}
+                        </div>
+                    </a>
+                `;
+            });
+            
+            html += '</div>';
+            
+            // 更新情報表示
+            if (CONFIG.isDev) {
+                html += `
+                    <div class="legend">
+                        <div class="legend-title">表示条件</div>
+                        <div>・自分が対象となっているイベント</div>
+                        <div>・自分が作成したイベント</div>
+                        <div>・開催日順で表示</div>
+                    </div>
+                `;
+            }
+            
+            container.innerHTML = html;
+        }
+
+        // HTMLエスケープ
+        function escapeHtml(unsafe) {
+            return unsafe
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        // リフレッシュ機能
+        function refreshEvents() {
+            loadEvents();
+        }
+
+        // ページ読み込み時実行
+        document.addEventListener('DOMContentLoaded', initPage);
+        
+        // プルリフレッシュ対応（モバイル）
+        let startY = 0;
+        let pullDistance = 0;
+        const pullThreshold = 80;
+        
+        document.addEventListener('touchstart', function(e) {
+            if (window.scrollY === 0) {
+                startY = e.touches[0].pageY;
+            }
+        });
+        
+        document.addEventListener('touchmove', function(e) {
+            if (window.scrollY === 0 && startY !== 0) {
+                pullDistance = e.touches[0].pageY - startY;
+                if (pullDistance > 0 && pullDistance < pullThreshold * 2) {
+                    e.preventDefault();
+                    // プルリフレッシュのビジュアルフィードバック
+                    const container = document.querySelector('.container');
+                    container.style.transform = `translateY(${Math.min(pullDistance / 2, pullThreshold)}px)`;
+                }
+            }
+        });
+        
+        document.addEventListener('touchend', function(e) {
+            if (pullDistance > pullThreshold) {
+                refreshEvents();
+            }
+            
+            // リセット
+            const container = document.querySelector('.container');
+            container.style.transform = '';
+            startY = 0;
+            pullDistance = 0;
+        });
+    </script>
+</body>
+</html>

@@ -29,7 +29,10 @@
     "crypto": "^1.0.1",
     "uuid": "^9.0.1",
     "axios": "^1.7.2",
-    "googleapis": "^140.0.1"
+    "googleapis": "^140.0.1",
+    "csurf": "^1.11.0",
+    "express-validator": "^7.0.1",
+    "connect-flash": "^0.1.1"
   },
   "devDependencies": {
     "nodemon": "^3.1.0"

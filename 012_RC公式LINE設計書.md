@@ -50,8 +50,9 @@
 
 ### 1.6 権限
 
-* 管理作業は**adminのみ**。各委員長には**admin権限を付与**（まずはシンプル運用）。
-* 管理者アカウントは`admin_users`テーブル（`username`/`password_hash`/`member_id?`）。
+* 管理作業は**admin_users登録者のみ**。各委員長には**admin_users**に登録して権限を付与。
+* 管理者アカウントは`admin_users`テーブル（`username`/`password_hash`/`member_id`）。
+* `members.role='staff'`は事務局メンバー（配信候補から除外、回答状況確認可）。
 
 ### 1.7 時刻（JST方針：保存も表示もJST）
 
@@ -164,6 +165,15 @@
 * 並び：**未回答を上位**、次に**開催日が近い順（JST）**。
 * タップで詳細へ遷移（回答・状況・履歴）。
 
+**E. 代理回答（管理画面のみ）**
+
+* **権限**：イベント作成者（`events.created_by_admin`）のみ
+* **対象**：FAX等でLINEを使わない会員への代理回答
+* **操作**：イベント詳細画面の会員一覧で**［出席代理］［欠席代理］**ボタン
+* **記録**：`event_responses.via='admin'`として追記型で保存
+* **表示**：代理回答には**「✏️」**マーカー表示（管理画面・LIFF共通）
+* **上書き**：本人のLIFF回答が後に来た場合、最新が現在値として優先
+
 ---
 
 ### 2.4 audiences（理事会・各委員会）
@@ -186,6 +196,43 @@
 
 ---
 
+### 2.6 運用・デバッグ・手動対応（実装記録より）
+
+**目的**：サイレント自動紐づけの運用とトラブルシューティング手順。
+
+#### 2.6.1 通常運用での動作確認
+```bash
+# VPS上で実行
+docker compose logs api-server --tail=10
+docker compose exec api-server npm run check-members
+```
+
+#### 2.6.2 未紐づけユーザーの確認・手動対応
+* **未紐づけユーザー抽出**：
+  ```bash
+  docker compose exec api-server npm run extract-unlinked-users
+  ```
+* **出力内容**：CSV形式（userId, displayName, normalized, result, reason, timestamp）と手動紐づけ手順
+* **手動紐づけ（SQLiteコンソール）**：
+  ```bash
+  docker compose exec api-server sqlite3 /app/data/rcline.db
+  UPDATE members SET line_user_id = 'U_xxxx', line_display_name = '表示名' WHERE id = XXXX;
+  ```
+
+#### 2.6.3 デバッグ・テスト機能
+* **紐づけロジック単体テスト**：
+  ```bash
+  docker compose exec api-server npm run test-linking
+  ```
+* **Webhook疑似テスト**：
+  ```bash
+  curl -X POST https://awf.technavigation.jp/api/line/webhook \
+    -H "Content-Type: application/json" \
+    -d "{\"events\":[{\"type\":\"follow\",\"source\":{\"userId\":\"U_test\"},\"timestamp\":$(date +%s)000}]}"
+  ```
+
+---
+
 ## 3. 運用上の補助・例外
 
 * **Sheets→DB同期（Members）**：
@@ -197,6 +244,55 @@
 
 * **紐付け不可時**：
   * displayNameと名簿が一致しない、または本人確認が曖昧な場合は**手動紐付け**までに留める（安全側）。
+
+### 3.1 開発環境設定（実装記録より）
+
+#### 3.1.1 重要な環境変数
+```env
+# 署名検証スキップ（開発・テスト用）
+DEV_ALLOW_INSECURE=1
+
+# サイレントモード
+ONBOARDING_MODE=silent
+
+# データベース・ファイル
+DATABASE_PATH=/app/data/rcline.db
+FILES_PUBLIC_URL_BASE=https://awf.technavigation.jp/files
+```
+
+#### 3.1.2 Docker環境のポイント
+* **必須ビルドフラグ**：`docker compose up --build -d`（新スクリプト追加時）
+* **SQLite直接アクセス**：`sqlite3 /app/data/rcline.db`（コンテナ内）
+* **Volume構成**：
+  - `sqlite_data`: データベース永続化
+  - `files_storage`: 画像ファイル保存  
+  - `logs_storage`: ログファイル保存
+
+### 3.2 トラブルシューティング（実装記録より）
+
+#### 3.2.1 よくある問題と解決策
+1. **Webhook受信できない**
+   - Caddyfile: `awf.technavigation.jp` でHTTPS必須
+   - LINE署名検証: `DEV_ALLOW_INSECURE=1`で開発時回避
+
+2. **紐づけ失敗**
+   - displayName取得失敗 → プロフィールAPI要確認
+   - name_key不一致 → 正規化ロジック確認
+
+3. **スクリプト反映されない**
+   - `docker compose up --build -d` で再ビルド必須
+
+#### 3.2.2 ログ確認方法
+```bash
+# APIサーバーログ
+docker compose logs api-server --tail=20
+
+# 友だち追加ログ
+docker compose exec api-server sh -c "find /app/logs -name '*.ndjson' -exec cat {} \;"
+
+# Redisキュー状況
+docker compose exec redis redis-cli KEYS "*"
+```
 
 ---
 
@@ -273,6 +369,7 @@
 3. 配信先選択
 
 * **全員／理事会／各委員会**のチェック（複数可）
+* 候補は`members.role='member'`のみ（staff除外）
 
 4. 受信者プレビュー
 
@@ -309,11 +406,19 @@
   * 基本：`title` / `held_at` / `body`
   * **画像**：ページ内に**プレビューJPG**を表示（幅100%）。下に\*\*「全画面で開く」\*\*（**オリジナルJPG**のURL）
     * 対象者：名簿順で現在値（出席／欠席／未回答）※イベントの回答（event_responses）は複数回出来るので、最新の情報を表示する。
+      * 会員名の前に公式LINE登録有無を表示：🟢（登録済み）／⚪（未登録）
+      * 出欠の右に代理回答マーカー：**✏️**（代理回答）
   * **送信要約**：`event_push_stats.success_count` / `fail_count` / `last_sent_at`
+* 代理回答機能（イベント作成者のみ）：
+
+  * 各会員の行に**［出席代理］［欠席代理］**ボタンを配置
+  * 代理回答確認ダイアログ：「〇〇さんの代理で出席/欠席を登録しますか？」
+  * 代理回答後、状況一覧に**「✏️」**マーカー表示
+  * **権限制御**：`events.created_by_admin = session.adminUser.id`で判定
 * 出力：
 
-  * **CSV：最新状態**（member\_id, name, status, extra\_text）
-  * **CSV：履歴**（response\_id, responded\_at, member\_id, name, status, extra\_text）
+  * **CSV：最新状態**（member\_id, name, status, extra\_text, via）
+  * **CSV：履歴**（response\_id, responded\_at, member\_id, name, status, extra\_text, via）
 * 再送：今回無し
 
 ---
@@ -321,7 +426,7 @@
 ### 1.6 A-AUDIENCE（マスタ管理）
 
 * 一覧＋CRUD：`name`（一意）, `sort_order`
-* 所属割当：\*\*全会員リスト（名簿順）\*\*にチェックON/OFF
+* 所属割当：**会員リスト（role='member'のみ、名簿順）**にチェックON/OFF
 
   * **ONだけ表示**トグル（確認用）
   * **インクリメンタルフィルタ**（入力即時絞り込み）
@@ -331,6 +436,7 @@
 ### 1.7 A-MEMBERS（参照のみ）
 
 * 表示：`id, name, display_order, role, line_user_id有無, is_target, line_display_name`
+* **role表示**: 'member' | 'staff'
 * **同期UI無し**（同期はCLIのみ）
 
 ---
@@ -345,40 +451,101 @@
 
 ---
 
-### 2.2 共通
+### 2.2 共通仕様
 
-* 認証：LIFFで`userId`→APIへ`x-line-user-id`→`members.line_user_id`突合
-* 表示時刻：JST
-* 名簿順：`display_order`
+**認証方式**:
+* 本番環境：LIFFで`userId`→APIへ`x-line-user-id`ヘッダー→`members.line_user_id`突合
+* 開発環境：`x-dev-line-user-id`ヘッダーによる擬似認証（`DEV_ALLOW_INSECURE=1`時）
+
+**技術構成**:
+* フロントエンド：バニラJavaScript + 共通CSS/JSライブラリ
+* ファイル構成：
+  * `common.css`：共通スタイル（レスポンシブ対応）
+  * `common.js`：共通関数（API通信、認証、ユーティリティ）
+  * `index.html`：イベント一覧画面
+  * `detail.html`：イベント詳細画面
+  * `register.html`：セルフ登録画面
+
+**表示仕様**:
+* 表示時刻：JST（Asia/Tokyo）
+* 名簿順：`display_order`（ASC）→ `name`（ASC）
+* レスポンシブデザイン：スマートフォン最適化
 
 ---
 
 ### 2.3 L-LIST（イベント一覧）
 
-* 並び：**未回答 → 開催日が近い順**
+**URL**: `/liff/index.html`
+
+**機能**:
+* 表示条件：**自分が対象となっているイベント、または自分が作成したイベント**
+  * 対象イベント：`events` と `event_targets` の結合で抽出
+  * 作成イベント：`events` と `admin_users` の結合で抽出  
+* 並び：**開催日順**（`held_at` 昇順）
 * 各行：タイトル／開催日／自分の出欠回答（未回答／出席／欠席）
-* タップ：L-DETAILへ
+* タップ：L-DETAILへ遷移（`detail.html?id={event_id}`）
+
+**UI仕様**:
+* ヘッダー：「📅 イベント一覧」
+* **ナビゲーション**：なし（ボタン不要）
+* プルリフレッシュ対応（モバイルでの更新操作）
+* 開発モード時：ユーザー情報と表示条件の説明を表示
+
+**API連携**:
+* `GET /api/liff/events` でイベント一覧取得
+* 認証：`x-line-user-id` ヘッダー（開発時は `x-dev-line-user-id`）
 
 ---
 
 ### 2.4 L-DETAIL（イベント詳細）
 
-* 上部：`title`／`held_at`／`body`（短文定型）
-* **画像**：ページ内に**プレビューJPG**（タップで**全画面表示**オーバーレイ or 新規タブで**オリジナルJPG**）
-* 回答：
+**URL**: `/liff/detail.html?id={event_id}`
 
+**レイアウト順序**（カード形式）:
+1. **タイトル** (`event.title`)
+2. **日時** (`event.held_at` をJST形式で表示）
+3. **画像** (プレビュー表示 + タップで全画面表示)
+4. **コメント** (`event.body`)
+5. **現在の回答状況** (既に回答済みの場合のみ表示)
+6. **出欠回答セクション** (`🗳️ 出欠回答`)
+7. **追加テキスト入力** (ボタンの上に配置)
+8. **出席・欠席ボタン** (横並び)
+9. **ボタン無効化の理由表示**
+
+**機能詳細**:
+* **画像**：ページ内に**プレビューJPG**（タップで**全画面表示**オーバーレイ）
+* **回答**：
   * **［出席］／［欠席］**（何度でも可＝**最新が現在値**）
-  * ONのイベントのみ表示。`attend_only=ON`は出席時だけ表示
+  * `extra_text_enabled=ON`のイベントのみ追加テキスト表示
+  * `extra_text_attend_only=ON` のとき、**出席**選択で表示／欠席時は非表示
+* **ボタン状態管理**（優先度順）：
+  1. 対象者でない場合：全ボタン無効
+  2. 開催日時が過ぎた場合：全ボタン無効  
+  3. 既に同じ回答済み：該当ボタンのみ無効
+* **折りたたみセクション**：
+  * **出欠状況**（👥 出欠状況一覧）…名簿順に現在値（出席／欠席／未回答）
+    * 会員名の前に公式LINE登録有無を表示：🟢（登録済み）／⚪（未登録）
+    * 出欠の右に代理回答マーカー：**✏️**（代理回答）
+  * **出欠回答履歴**（📝 回答履歴）…`responded_at / name / status / extra_text`
+    * 代理回答履歴には**✏️**マーカー表示
+  * **凡例**：画面下部に表示
+    ```
+    🟢：公式LINE登録済み　⚪：公式LINE未登録　✏️：代理回答
+    ```
 
-    * `extra_text_attend_only=ON` のとき、**出席**選択で表示／欠席時は非表示
-* 下部：
+**UI仕様**:
+* ヘッダー：「📅 イベント詳細」
+* **ナビゲーション**：「← 一覧」ボタンのみ (index.htmlへ戻る)
+* 開発モード時：ユーザー情報とイベントIDを表示
 
-  * **出欠状況**（折りたたみ）…名簿順に現在値（出席／欠席／未回答）
-  * **出欠回答履歴**（折りたたみ、状況展開時のみリンク表示）…`responded_at / name / status / extra_text`
+**API連携**:
+* `GET /api/liff/events/:id` でイベント詳細取得
+* `POST /api/liff/events/:id/response` で回答送信
+* 認証：`x-line-user-id` ヘッダー（開発時は `x-dev-line-user-id`）
 
-**エラー**
-
-* 招待対象外：403
+**エラー処理**:
+* 招待対象外：403 Access Denied
+* イベント不存在：404 Event Not Found
 * 期限超過：今回なし（`deadline_at`はnull運用）
 
 ---
@@ -503,7 +670,7 @@
 ### GET /api/admin/members
 
 * **Role**: admin
-* **Query**: `?is_target=1&has_line=1`
+* **Query**: `?role=member&has_line=1`
 * **Response**:
 
   ```json
@@ -526,8 +693,8 @@
 
   * `all=1`（全員を候補に含める）
   * `audience_ids=1,2,3`（カンマ区切り）
-  * `require_target=1`（`is_target=1` のみ）※デフォルト1
-  * `require_line=1`（`line_user_id NOT NULL` のみ）※デフォルト1
+  * `require_member=1`（`role='member'` のみ）※デフォルト1
+  * `require_line=1`（`line_user_id NOT NULL` のみ）※デフォルト0
 * **Response**:
 
   ```json
@@ -535,7 +702,7 @@
       { "member_id": 101, "name": "山田太郎", "display_order": 10 }
   ] }
   ```
-* **処理**: audiencesと全員指定を合成→`is_target`/`line_user_id`でフィルタ→`display_order`順で返却
+* **処理**: audiencesと全員指定を合成→`role='member'`でフィルタ→`display_order`順で返却
 
 ---
 
@@ -609,8 +776,9 @@
     "targets_total": 45,
     "push_stats": { "success": 44, "fail": 1, "last_sent_at": "..." },
     "current_status": [
-      { "member_id":101, "name":"山田太郎",
-        "status":"attend|absent|pending", "extra_text":"（最新値）" }
+      { "member_id":101, "name":"山田太郎", "display_order": 10, "is_target": 1,
+        "status":"attend|absent|pending", "extra_text":"（最新値）", 
+        "responded_at": "2025-08-22T14:30:00+09:00", "via": "liff|admin" }
     ]
   }
   ```
@@ -623,13 +791,13 @@
 ### GET /api/admin/events/{id}/export/latest.csv
 
 * **Role**: admin
-* **Response**: CSV（`member_id,name,status,extra_text`）
+* **Response**: CSV（`member_id,name,status,extra_text,via`）
 * **処理**: 「現在値」をCSV化し返却
 
 ### GET /api/admin/events/{id}/export/history.csv
 
 * **Role**: admin
-* **Response**: CSV（`response_id,responded_at,member_id,name,status,extra_text`）
+* **Response**: CSV（`response_id,responded_at,member_id,name,status,extra_text,via`）
 * **処理**: `event_responses` の回答履歴を時系列でCSV化
 
 ---
@@ -694,6 +862,43 @@
      * `extra_text_enabled=1` のときのみ `extra_text` を保存
      * `attend_only=1` かつ `status='absent'` の場合は `extra_text` を無視
   3. `201`（再回答可能＝最新が現在値）
+
+---
+
+## 3.9 代理回答機能（管理画面）
+
+### POST /api/admin/events/{id}/proxy-response
+
+* **Role**: admin（イベント作成者のみ）
+* **Headers**: セッション認証
+* **Fields**:
+
+  ```json
+  { 
+    "member_id": number,
+    "status": "attend" | "absent", 
+    "extra_text": "string?" 
+  }
+  ```
+* **Response**:
+
+  ```json
+  { "ok": true, "current": "attend|absent" }
+  ```
+* **処理**:
+
+  1. 権限確認：`events.created_by_admin = req.session.adminUser.id`
+  2. 対象確認：`member_id`が`event_targets`に存在するか検証
+  3. 追記型で `event_responses` INSERT（`via='admin'`）
+
+     * `extra_text_enabled=1` のときのみ `extra_text` を保存
+     * `attend_only=1` かつ `status='absent'` の場合は `extra_text` を無視
+  4. `201`（複数回代理回答可能＝最新が現在値）
+
+**注意**：
+* **権限**: イベント作成者（`created_by_admin`）のみが代理回答可能
+* **操作者追跡**: `event_responses.via='admin'` + `events.created_by_admin`の組み合わせで特定可能
+* **UI表示**: 管理画面・LIFF画面共に代理回答には絵文字「✏️」で表示
 
 ### GET /api/liff/events/{id}/status
 
@@ -974,8 +1179,8 @@ UPDATE members
 
 * **ファイル**
 
-  * Webhook：`/var/app/logs/line/WEBHOOK-YYYY-MM-DD.ndjson`
-  * Register：`/var/app/logs/line/REGISTER-YYYY-MM-DD.ndjson`
+  * Webhook：`/app/logs/line/WEBHOOK-YYYY-MM-DD.ndjson`
+  * Register：`/app/logs/line/REGISTER-YYYY-MM-DD.ndjson`
 * **共通レコード例**
 
 ```json
@@ -986,6 +1191,12 @@ UPDATE members
 ```
 
 * **署名不一致**や**プロフィール取得失敗**は `reason` を付与して記録。
+
+#### 3.7.5.1 ログ活用スクリプト（実装済み）
+* **未紐づけユーザー抽出**：`extract-unlinked-users.js`
+  - NDJSONログを解析し、UNMATCHED/AMBIGUOUS/ALREADY_LINKED_OTHER結果のユーザーを抽出
+  - CSV形式出力と手動紐づけ手順を提示
+  - 重複排除（最新ログ優先）
 
 ---
 
@@ -1036,9 +1247,11 @@ UPDATE members
   * `display_order`：名簿の**表示順**。出欠状況一覧の並びに使用。未設定NULLは末尾扱い。`idx_members_display_order`。
   * `line_user_id`：LINEのuserId。**ユニーク**。サイレント自動紐付け／セルフ登録／手動同期で設定。
   * `line_display_name`：最後に取得したLINE表示名（参考情報）。本人以外が操作した可能性の監査などに有用。運用で**都度更新**してよい。
-  * `is_target`：配信対象フラグ（0/1）。**1＝配信候補**。初期0、`line_user_id`登録時に1へ自動切替（運用でOFF可）。`idx_members_is_target`。
-  * `role`：`'member' | 'admin'`。各委員長に`admin`を付与する方針。
-* 配信対象の基本式：`audience_members ∪ 全員指定` → **`is_target=1` ∩ `line_user_id NOT NULL`**。
+  * `is_target`：LINE送信フラグ（0/1）。**1＝実際にLINE送信する**。**0＝配信候補に含まれていても実際にはLINE送信しない**。初期0、`line_user_id`登録時に1へ自動切替。`idx_members_is_target`。
+  * `role`：`'member' | 'staff'`。staffは事務局メンバー（配信候補除外、回答状況確認可）。
+* 配信候補選択：イベント作成画面で送信先として、まずaudiencesからグループ名を選択 → audience_membersから、送信対象の会員を選択。
+* 配信候補確定：選択された member_ids → `audience_members ∪ 全員指定`。
+* 実際の送信対象：配信候補確定 ∩ **`is_target=1`**。
 * 注意：**同姓同名は存在しない前提**。名寄せは `name_key` で完全一致のみ。
 
 ---
@@ -1051,7 +1264,7 @@ UPDATE members
   * `id`：PK。
   * `username`：ログインID。**ユニーク**。
   * `password_hash`：**bcrypt**等でハッシュ化した値。生パスワードは保持しない。
-  * `member_id`：任意。対応する会員がいる場合のみ設定。外部キー（削除時はNULL）。
+  * `member_id`：必須。対応する会員。外部キー（削除時はCASCADE）。
   * `created_at` / `updated_at`：JST ISO8601。
 * 運用：初期は環境変数から**種アカウント**を投入。ロックアウトやCSRF等はアプリ層で制御。
 
@@ -1116,7 +1329,8 @@ UPDATE members
   * `member_id`：`members.id` へのFK。
   * **複合PK**：`(event_id, member_id)`。同一イベントへの重複登録を防止。
 * インデックス：`idx_evt_targets_member` により、会員→対象イベントの探索を高速化。
-* 備考：**invited_at / invited_by は保持しない**（配信時刻・発信者は `events` とログで管理）。削除はイベント削除に連鎖。
+* eventsのデータ追加と同期しているため、`created_at`, `updated_at` は省略。
+* 備考：削除はイベント削除に連鎖。
 
 ---
 
@@ -1162,7 +1376,7 @@ CREATE TABLE members (
   line_user_id     TEXT UNIQUE,
   line_display_name TEXT,                       -- 参考用：最後に見えた表示名
   is_target        INTEGER NOT NULL DEFAULT 0,  -- 0/1：配信対象に含めるか
-  role             TEXT NOT NULL DEFAULT 'member', -- 'member' | 'admin'
+  role             TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('member', 'staff')), -- 'member' | 'staff'
   created_at       TEXT NOT NULL,
   updated_at       TEXT NOT NULL
 );
@@ -1175,10 +1389,10 @@ CREATE TABLE admin_users (
   id               INTEGER PRIMARY KEY AUTOINCREMENT,
   username         TEXT NOT NULL UNIQUE,
   password_hash    TEXT NOT NULL,
-  member_id        INTEGER,
+  member_id        INTEGER NOT NULL,
   created_at       TEXT NOT NULL,
   updated_at       TEXT NOT NULL,
-  FOREIGN KEY(member_id) REFERENCES members(id) ON UPDATE CASCADE ON DELETE SET NULL
+  FOREIGN KEY(member_id) REFERENCES members(id) ON UPDATE CASCADE ON DELETE CASCADE
 );
 
 -- グループ（理事会・各委員会）
@@ -1258,7 +1472,7 @@ CREATE TABLE event_push_stats (
 ```
 
 **送信対象の算出（概念）**
-`(audience_members ∪ 全員指定) ∩ is_target=1 ∩ line_user_id NOT NULL` を基底集合とし、受信者プレビューで除外した結果が `event_targets`。
+配信候補選択：audiencesからグループ名選択 → audience_membersから送信対象の会員選択 → 受信者プレビューで除外 → `event_targets` → 実際の送信：`is_target=1`。
 
 **最新状態クエリ（例）**
 
@@ -1298,7 +1512,7 @@ ORDER BY (SELECT display_order FROM members m WHERE m.id = et.member_id) ASC NUL
 
 ### 5.2 Push詳細ログ（NDJSON）
 
-* パス：`/var/app/logs/push/YYYY-MM-DD.ndjson`
+* パス：`/app/logs/push/YYYY-MM-DD.ndjson`
 * 1行例：
 
   ```json
@@ -1306,6 +1520,50 @@ ORDER BY (SELECT display_order FROM members m WHERE m.id = et.member_id) ASC NUL
   ```
 * 参照：**CLIで取得**（list/pull）。画面UIは無し。
 * 画面は `event_push_stats` のみ使用（A-EVENT-DETAILで要約表示）。
+
+### 5.3 VPS環境構成（実装記録より）
+
+#### 5.3.1 配置とURL構成
+* **パス**：`/opt/rcline/`
+* **メインURL**：`https://awf.technavigation.jp/`
+* **API URL**：`https://awf.technavigation.jp/api/`
+* **Webhook URL**：`https://awf.technavigation.jp/api/line/webhook`
+* **ファイル公開**：`https://awf.technavigation.jp/files/`
+
+#### 5.3.2 Caddyfile構成（HTTPS必須）
+```
+awf.technavigation.jp {
+    # 画像ファイル公開
+    handle_path /files/* {
+        root * /var/www
+        file_server
+    }
+
+    # メインAPIサーバー（管理画面 + LIFF API + LINE webhook）
+    handle /api/* {
+        reverse_proxy api-server:4000
+    }
+
+    # n8n webhook path（既存システム併用）
+    handle_path /webhook/* {
+        reverse_proxy n8n:5678
+    }
+    
+    # default upstream (adjust to your infra)
+    reverse_proxy n8n:5678
+}
+```
+
+#### 5.3.3 LINE Developers設定
+* **Webhook URL**：`https://awf.technavigation.jp/api/line/webhook`
+* **HTTPS必須**：LINE WebhookはHTTPS環境でのみ動作
+
+#### 5.3.4 Google Cloud Console設定
+* **Client ID**：`487021331289-s3v512dpcf4hn6h1crb7bitolp6sea2q.apps.googleusercontent.com`
+* **承認済みリダイレクトURI**：
+  - `https://awf.technavigation.jp/rest/oauth2-credential/callback`
+  - `https://awf.technavigation.jp/oauth/callback`
+  - `http://localhost:3001/oauth/callback`（ローカル開発用）
 
 ---
 
@@ -1341,8 +1599,8 @@ ORDER BY (SELECT display_order FROM members m WHERE m.id = et.member_id) ASC NUL
 * 会員は**公式LINEの画像**をまず見て、次メッセージの**リンクから回答**
 * **A-EVENT-DETAIL**でサマリ確認・CSV出力
 
-  * 最新CSV：`member_id, name, status, extra_text`
-  * 履歴CSV：`response_id, responded_at, member_id, name, status, extra_text`
+  * 最新CSV：`member_id, name, status, extra_text, via`
+  * 履歴CSV：`response_id, responded_at, member_id, name, status, extra_text, via`
 
 ---
 
