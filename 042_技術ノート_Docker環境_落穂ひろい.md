@@ -347,3 +347,70 @@ services:
 - **移行時注意点**: 環境変数、ボリュームパス、セキュリティ設定の差異確認
 
 ---
+
+## 問題の根本解決実施記録 2025.08.24
+
+### 実施した対策
+
+上記で記録した全ての問題を**docker-compose.override.yml**による開発環境最適化で根本解決しました。
+
+#### **1. ファイル更新反映問題の完全解決** ✅
+**対策**:
+```yaml
+# docker-compose.override.yml
+services:
+  api-server:
+    volumes:
+      - ./services/api-server/public:/app/public  # HTML/CSS/JS即時反映
+      - ./services/api-server/src:/app/src        # APIロジック即時反映
+```
+
+**結果**: publicディレクトリに加えてsrcディレクトリも即時反映。新規ファイル追加時も再ビルド不要。
+
+#### **2. Caddy起動失敗問題の解決** ✅
+**対策**:
+```yaml
+# 依存関係の最適化
+api-server:
+  depends_on:
+    - redis  # caddyへの依存を除去
+
+linehook:
+  depends_on:
+    - redis  # caddyからredisに変更
+
+# 開発時はCaddyを無効化
+caddy:
+  profiles: ["production"]  # 開発時は起動しない
+```
+
+**結果**: Caddy起動失敗時でも開発継続可能。直接localhost:4000でアクセス。
+
+#### **3. 開発支援機能の強化** ✅
+**新機能**:
+- `/api/liff/dev-config`エンドポイント追加
+- 開発用テストボタン（GUI操作でユーザー切替）
+- localStorage活用でセッション管理
+
+**結果**: コンソールコマンド不要でGUI操作のみでテスト可能。
+
+### 改善効果
+
+- **開発効率**: ファイル変更→保存→ブラウザリロードで即座に反映
+- **安定性**: 依存関係問題による起動失敗の根絶
+- **使いやすさ**: 新規開発者でも迷わずテスト可能
+- **保守性**: 開発・本番環境の明確な分離
+
+### 運用方法
+
+```bash
+# 日常開発（override.yml自動適用）
+docker compose up -d
+
+# 本番相当テスト（override.ymlを無効化）
+docker compose --profile production up -d
+```
+
+**注記**: 本記録で挙げた問題は全て解決済み。今後の開発では上記改善版を標準とする。
+
+---

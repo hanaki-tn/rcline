@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>会員登録 - RC公式LINE</title>
+    <link rel="stylesheet" href="common.css">
+    <style>
+        .register-form {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #333;
+        }
+        
+        .form-input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        
+        .form-input:focus {
+            outline: none;
+            border-color: #4CAF50;
+            box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+        }
+        
+        .form-help {
+            margin-top: 8px;
+            font-size: 14px;
+            color: #666;
+            line-height: 1.5;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+        }
+        
+        .btn {
+            flex: 1;
+            padding: 14px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: none;
+            text-align: center;
+        }
+        
+        .btn-primary {
+            background-color: #4CAF50;
+            color: white;
+        }
+        
+        .btn-primary:hover:not(:disabled) {
+            background-color: #45a049;
+        }
+        
+        .btn-primary:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .btn-secondary {
+            background-color: #f5f5f5;
+            color: #666;
+            border: 1px solid #ddd;
+        }
+        
+        .btn-secondary:hover {
+            background-color: #e8e8e8;
+        }
+        
+        .error-message {
+            color: #d32f2f;
+            font-size: 14px;
+            margin-top: 8px;
+            padding: 8px 12px;
+            background-color: #ffebee;
+            border-radius: 4px;
+            display: none;
+        }
+        
+        .success-message {
+            color: #2e7d32;
+            font-size: 14px;
+            margin-top: 8px;
+            padding: 8px 12px;
+            background-color: #e8f5e9;
+            border-radius: 4px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>👤 会員登録</h1>
+        </div>
+
+        <!-- メインコンテンツ -->
+        <div id="main-content">
+            <div class="register-form">
+                <form id="register-form">
+                    <div class="form-group">
+                        <label for="full_name" class="form-label">お名前（漢字）</label>
+                        <input 
+                            type="text" 
+                            id="full_name" 
+                            name="full_name" 
+                            class="form-input" 
+                            placeholder="例：山田太郎"
+                            maxlength="50"
+                            required
+                        >
+                        <div class="form-help">
+                            浦和北東ロータリークラブの会員名を漢字でフルネーム入力してください。（例：山田太郎）
+                        </div>
+                    </div>
+
+                    <div id="error-message" class="error-message"></div>
+                    <div id="success-message" class="success-message"></div>
+
+                    <div class="button-group">
+                        <button type="submit" class="btn btn-primary" id="submit-btn">
+                            登録
+                        </button>
+                        <button type="button" class="btn btn-secondary" id="skip-btn">
+                            スキップ
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- ユーザー情報（開発用） -->
+        <div id="dev-info" class="d-none"></div>
+        
+        <!-- 開発用テストボタン（開発環境のみ） -->
+        <div id="dev-controls" class="d-none" style="margin-top: 20px; padding: 15px; background: #f0f8ff; border-radius: 8px;">
+            <h4>🧪 開発用テスト</h4>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px;">
+                <button type="button" class="btn btn-secondary" onclick="setTestUser('linked')" style="flex: none;">
+                    紐付け済みユーザーに切替
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="setTestUser('unlinked')" style="flex: none;">
+                    未紐付けユーザーに切替
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="clearTestUser()" style="flex: none;">
+                    設定をクリア
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="common.js"></script>
+    <script>
+        // URLパラメータ取得
+        const urlParams = new URLSearchParams(window.location.search);
+        const fromEvents = urlParams.get('from') === 'events';
+
+        // フォーム要素
+        const form = document.getElementById('register-form');
+        const fullNameInput = document.getElementById('full_name');
+        const submitBtn = document.getElementById('submit-btn');
+        const skipBtn = document.getElementById('skip-btn');
+        const errorMessage = document.getElementById('error-message');
+        const successMessage = document.getElementById('success-message');
+        
+        // 開発用設定
+        let devConfig = null;
+
+        // ページ初期化
+        async function initPage() {
+            try {
+                // LIFF初期化
+                await initializeLiff();
+
+                // 開発環境でのユーザー情報表示
+                if (CONFIG.isDev) {
+                    // 開発用設定を取得
+                    try {
+                        const configResponse = await fetch('/api/liff/dev-config');
+                        devConfig = await configResponse.json();
+                    } catch (error) {
+                        console.warn('開発用設定の取得に失敗:', error);
+                    }
+                    
+                    const devInfo = document.getElementById('dev-info');
+                    devInfo.classList.remove('d-none');
+                    devInfo.innerHTML = `
+                        <div class="message message-info">
+                            <strong>開発モード:</strong> 会員登録画面
+                            ${fromEvents ? '<br>（イベント一覧から遷移）' : ''}
+                        </div>
+                    `;
+                    
+                    // 開発用コントロールを表示
+                    const devControls = document.getElementById('dev-controls');
+                    devControls.classList.remove('d-none');
+                }
+
+                // 既に紐付け済みかチェック
+                try {
+                    const meResponse = await apiRequest('/api/liff/me');
+                    const userData = await meResponse.json();
+                    
+                    if (userData.is_target === 1) {
+                        // 既に紐付け済みの場合
+                        showSuccess('既に会員登録が完了しています。');
+                        setTimeout(() => {
+                            navigateAfterRegistration();
+                        }, 2000);
+                        return;
+                    }
+                } catch (error) {
+                    console.error('会員情報確認エラー:', error);
+                }
+
+            } catch (error) {
+                console.error('ページ初期化エラー:', error);
+                showError('認証に失敗しました。LINEから再度アクセスしてください。');
+            }
+        }
+
+        // 登録処理
+        async function handleSubmit(event) {
+            event.preventDefault();
+            
+            const fullName = fullNameInput.value.trim();
+            
+            if (!fullName) {
+                showError('お名前を入力してください。');
+                return;
+            }
+
+            // ボタン無効化
+            submitBtn.disabled = true;
+            submitBtn.textContent = '登録中...';
+            hideMessages();
+
+            try {
+                const response = await apiRequest('/api/liff/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ full_name: fullName })
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    showSuccess('会員登録が完了しました。');
+                    
+                    // 2秒後に遷移
+                    setTimeout(() => {
+                        navigateAfterRegistration();
+                    }, 2000);
+                } else {
+                    const error = await response.json();
+                    if (error.code === 'NO_MATCH') {
+                        showError('入力された名前が会員名簿と一致しませんでした。正確な漢字フルネームを入力してください。');
+                    } else {
+                        showError(error.message || '登録に失敗しました。');
+                    }
+                    
+                    // ボタン再有効化
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = '登録';
+                }
+            } catch (error) {
+                console.error('登録エラー:', error);
+                showError('通信エラーが発生しました。もう一度お試しください。');
+                
+                // ボタン再有効化
+                submitBtn.disabled = false;
+                submitBtn.textContent = '登録';
+            }
+        }
+
+        // スキップ処理
+        function handleSkip() {
+            if (confirm('会員登録をスキップしますか？\nスキップすると出欠回答機能が利用できません。')) {
+                closeLiffWindow();
+            }
+        }
+
+        // 登録後の遷移
+        function navigateAfterRegistration() {
+            if (fromEvents) {
+                // イベント一覧から来た場合は一覧へ戻る
+                window.location.href = 'index.html';
+            } else {
+                // それ以外はLINEチャット画面へ
+                closeLiffWindow();
+            }
+        }
+
+        // LIFFウィンドウを閉じる
+        function closeLiffWindow() {
+            if (window.liff && window.liff.isInClient()) {
+                window.liff.closeWindow();
+            } else {
+                // 開発環境などLIFF外の場合
+                window.close();
+                // ウィンドウが閉じられない場合のフォールバック
+                setTimeout(() => {
+                    window.location.href = 'index.html';
+                }, 100);
+            }
+        }
+
+        // エラーメッセージ表示
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+            successMessage.style.display = 'none';
+        }
+
+        // 成功メッセージ表示
+        function showSuccess(message) {
+            successMessage.textContent = message;
+            successMessage.style.display = 'block';
+            errorMessage.style.display = 'none';
+        }
+
+        // メッセージ非表示
+        function hideMessages() {
+            errorMessage.style.display = 'none';
+            successMessage.style.display = 'none';
+        }
+
+        // 開発用テスト関数
+        function setTestUser(type) {
+            if (!devConfig) {
+                alert('開発用設定が読み込まれていません');
+                return;
+            }
+            
+            let userId;
+            if (type === 'linked') {
+                userId = devConfig.defaultUserId;
+            } else if (type === 'unlinked') {
+                userId = devConfig.unlinkedUserId;
+            }
+            
+            if (userId) {
+                localStorage.setItem('dev-line-user-id', userId);
+                alert(`テストユーザーを ${type} に設定しました\nページをリロードしてください`);
+            }
+        }
+        
+        function clearTestUser() {
+            localStorage.removeItem('dev-line-user-id');
+            alert('テストユーザー設定をクリアしました\nページをリロードしてください');
+        }
+
+        // イベントリスナー設定
+        form.addEventListener('submit', handleSubmit);
+        skipBtn.addEventListener('click', handleSkip);
+
+        // ページ読み込み時の処理
+        document.addEventListener('DOMContentLoaded', initPage);
+    </script>
+</body>
+</html>

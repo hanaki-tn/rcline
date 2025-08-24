@@ -46,6 +46,17 @@
                     return;
                 }
 
+                // 紐付け状態確認（is_target チェック）
+                const meResponse = await apiRequest('/api/liff/me');
+                const userData = await meResponse.json();
+                
+                // 未紐付け（is_target=0）の場合は会員登録画面へ遷移
+                if (!userData.is_target || userData.is_target === 0) {
+                    console.log('未紐付けユーザーのため、会員登録画面へ遷移します');
+                    window.location.href = 'register.html?from=events';
+                    return;
+                }
+
                 // 開発環境でのユーザー情報表示
                 if (CONFIG.isDev) {
                     const devInfo = document.getElementById('dev-info');

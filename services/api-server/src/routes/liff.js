@@ -31,7 +31,7 @@ function requireLineUser(req, res, next) {
 function getMemberByLineUserId(db, userId) {
   return new Promise((resolve, reject) => {
     db.get(
-      'SELECT id, name FROM members WHERE line_user_id = ?',
+      'SELECT id, name, is_target FROM members WHERE line_user_id = ?',
       [userId],
       (err, row) => {
         if (err) reject(err);
@@ -40,6 +40,49 @@ function getMemberByLineUserId(db, userId) {
     );
   });
 }
+
+// 自分の情報取得（紐付け状態確認用）
+router.get('/me', requireLineUser, async (req, res) => {
+  try {
+    const member = await getMemberByLineUserId(req.db, req.lineUserId);
+    
+    if (member) {
+      // 紐付け済み
+      res.json({
+        member_id: member.id,
+        name: member.name,
+        is_target: member.is_target,
+        linked: true
+      });
+    } else {
+      // 未紐付け
+      res.json({
+        member_id: null,
+        name: null,
+        is_target: 0,
+        linked: false
+      });
+    }
+  } catch (error) {
+    console.error('Error fetching member info:', error);
+    res.status(500).json({
+      code: 'INTERNAL_ERROR',
+      message: 'Failed to fetch member info'
+    });
+  }
+});
+
+// 開発環境設定取得
+router.get('/dev-config', (req, res) => {
+  if (process.env.NODE_ENV !== 'development') {
+    return res.status(404).json({ error: 'Not found' });
+  }
+  
+  res.json({
+    defaultUserId: process.env.DEV_DEFAULT_USER_ID || 'U45bc8ea2cb931b9ff43aa41559dbc7fc',
+    unlinkedUserId: process.env.DEV_UNLINKED_USER_ID || 'U_test_unlinked'
+  });
+});
 
 // セルフ登録
 router.post('/register', requireLineUser, async (req, res) => {

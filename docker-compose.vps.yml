@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  api-server:
+    build:
+      context: ./services/api-server
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - DATABASE_PATH=/app/data/rcline.db
+      - FILES_PUBLIC_URL_BASE=https://awf.technavigation.jp/files
+    volumes:
+      - ./rcline.db:/app/data/rcline.db
+      - ./logs:/app/logs
+      - /var/www/files:/app/uploads  # ファイルアップロード用
+    depends_on:
+      - redis
+    env_file:
+      - .env.production
+
+  linehook:
+    build:
+      context: ./services/linehook
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+    depends_on:
+      - redis
+    env_file:
+      - .env.production
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+      - /var/www:/var/www  # 静的ファイル用
+    depends_on:
+      - api-server
+      - linehook
+
+volumes:
+  redis_data:
+  caddy_data:
+  caddy_config:

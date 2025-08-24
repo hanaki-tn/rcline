@@ -36,7 +36,6 @@ services:
     networks: [rcline]
     depends_on:
       - redis
-      # - caddy  # 一時無効化
 
   # Redis（ジョブキュー用）
   redis:
@@ -61,7 +60,7 @@ services:
       - FETCH_TIMEOUT_MS=${FETCH_TIMEOUT_MS:-4000}
     networks: [rcline]
     depends_on:
-      - caddy
+      - redis  # caddyからredisに変更（開発時の起動問題回避）
 
   caddy:
     image: caddy:2

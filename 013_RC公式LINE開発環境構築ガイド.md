@@ -34,9 +34,11 @@ services:
   linehook:      # 既存サービス（削除予定）
 ```
 
-**開発時の注意**:
-- `public`ディレクトリはbind mountで即時反映
-- Caddyは開発時は無効化推奨（depends_on問題回避）
+**開発時の特徴** (2025.08.24改善版):
+- `public`・`src`ディレクトリは**bind mountで即時反映**
+- **Caddyは開発時は自動無効化**（profile制御で起動問題を解決）
+- **依存関係を最適化**（redis直接依存、Caddy依存除去）
+- **直接ポート4000アクセス**でCaddy不要
 
 ---
 
@@ -86,9 +88,15 @@ curl http://localhost:4000/health
 docker compose logs api-server --tail=20
 ```
 
-**トラブルシューティング**:
-- Caddy起動失敗 → `depends_on`からcaddyを一時コメントアウト
-- ファイル更新が反映されない → bind mount設定確認（042_技術ノート_Docker環境_落穂ひろい.md参照）
+**トラブルシューティング** (2025.08.24改善版):
+- **ファイル更新が反映されない** → ✅解決済み（srcディレクトリも自動マウント）
+- **Caddy起動失敗** → ✅解決済み（開発時は自動無効化）
+- **新規ファイル認識されない** → ✅解決済み（bind mount範囲拡大）
+
+**改善前の問題が解決**:
+- docker-compose.override.ymlで開発環境を最適化
+- 依存関係問題を根本解決
+- 開発用API（/api/liff/dev-config）で設定管理を改善
 
 ---
 
@@ -183,13 +191,27 @@ services/api-server/public/liff/
 }
 ```
 
-### 4.4 擬似認証の実装方法
+### 4.4 擬似認証の実装方法（2025.08.24改善版）
+
+**開発用テストボタンでの認証切替**:
+```javascript
+// register.html での開発支援機能
+function setTestUser(type) {
+  const devConfig = await fetch('/api/liff/dev-config');
+  const config = await devConfig.json();
+  
+  if (type === 'linked') {
+    localStorage.setItem('dev-line-user-id', config.defaultUserId);
+  } else if (type === 'unlinked') {
+    localStorage.setItem('dev-line-user-id', config.unlinkedUserId);
+  }
+}
+```
 
 **JavaScript側での認証ヘッダー送信**:
 ```javascript
-// common.js での実装例
+// common.js での実装例（改善版）
 function apiRequest(endpoint, options = {}) {
-  // 開発環境での擬似認証
   const headers = {
     'Content-Type': 'application/json',
     ...options.headers
@@ -197,7 +219,9 @@ function apiRequest(endpoint, options = {}) {
   
   // 開発環境では擬似LINE user IDを使用
   if (window.location.hostname === 'localhost') {
-    headers['x-dev-line-user-id'] = 'U_test_user_001';
+    // localStorageから取得、なければデフォルト値
+    const devUserId = localStorage.getItem('dev-line-user-id') || 'U45bc8ea2cb931b9ff43aa41559dbc7fc';
+    headers['x-dev-line-user-id'] = devUserId;
   }
   
   return fetch(endpoint, {
@@ -218,14 +242,20 @@ async function loadEvents() {
 }
 ```
 
-### 4.5 開発・テスト手順
+### 4.5 開発・テスト手順（2025.08.24改善版）
 
-**1. ブラウザでの表示確認**:
+**1. 簡単なテスト方法**:
 ```bash
-# 開発者ツールでデバイス表示切り替え
-F12 → デバイス切り替えアイコン → iPhone SE / Galaxy S21
+# 基本確認
+1. http://localhost:4000/liff/index.html にアクセス
+2. 自動的に会員登録画面へ遷移することを確認
+3. 画面下部の開発用テストボタンを使用
+   - 「未紐付けユーザーに切替」→ リロード
+   - 「紐付け済みユーザーに切替」→ リロード
+4. 登録可能な名前で実際の登録フロー確認
 
-# 推奨テスト環境
+# デバイス表示確認
+F12 → デバイス切り替えアイコン → iPhone SE / Galaxy S21
 - iPhone SE (375×667)
 - iPhone 12 Pro (390×844) 
 - Galaxy S21 (360×800)

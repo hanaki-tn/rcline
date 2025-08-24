@@ -1,8 +1,22 @@
 .env
 .env.local
 .env.prod
+.env.production
 node_modules
 .caddy
 dist
 *.log
 .DS_Store
+
+# VPS運用ファイル（バックアップ）
+*.backup.*
+caddy/Caddyfile.backup*
+docker-compose.yml.backup*
+
+# データベースファイル（本番データ保護）
+rcline.db
+*.db-journal
+
+# ログファイル
+logs/
+*.ndjson

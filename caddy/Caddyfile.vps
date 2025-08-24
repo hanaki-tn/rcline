@@ -1,0 +1,43 @@
+awf.technavigation.jp {
+    # 画像ファイル公開
+    handle_path /files/* {
+        root * /var/www
+        file_server
+    }
+
+    # Static (optional): keep if you serve static files under /static
+    handle_path /static/* {
+        root * /opt/www
+        file_server
+    }
+
+    # RC LINE システム - 新URL構造
+    handle_path /rcline/api/* {
+        reverse_proxy api-server:4000
+    }
+    
+    # RC LINE LIFF画面
+    handle_path /rcline/* {
+        root * /var/www/rcline
+        file_server
+        try_files {path} /index.html
+    }
+
+    # 従来のAPI（互換性維持）
+    handle /api/* {
+        reverse_proxy api-server:4000
+    }
+
+    # n8n webhook path
+    handle_path /webhook/* {
+        reverse_proxy n8n:5678
+    }
+
+    # linehook: 既存Node service（移行完了まで保持）
+    handle /linehook/* {
+        reverse_proxy linehook:3000
+    }
+
+    # default upstream (adjust to your infra)
+    reverse_proxy n8n:5678
+}

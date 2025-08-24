@@ -1,10 +1,10 @@
-// RC公式LINE LIFF 共通JavaScript
+// RC公式LINE LIFF 共通JavaScript（VPS本番用）
 
 // 共通設定
 const CONFIG = {
-    API_BASE: '',  // 相対パス使用
-    DEV_USER_ID: 'U45bc8ea2cb931b9ff43aa41559dbc7fc', // 開発用テストユーザーID（花木さん）
-    isDev: window.location.hostname === 'localhost'
+    API_BASE: '/rcline',  // VPS用パス
+    DEV_USER_ID: 'U45bc8ea2cb931b9ff43aa41559dbc7fc',
+    isDev: false  // 本番環境
 };
 
 // API リクエストヘルパー
@@ -14,12 +14,7 @@ async function apiRequest(endpoint, options = {}) {
         ...options.headers
     };
     
-    // 開発環境では擬似LINE user IDを使用
-    if (CONFIG.isDev) {
-        // localStorageから開発用userIdを取得、なければデフォルト値を使用
-        const devUserId = localStorage.getItem('dev-line-user-id') || CONFIG.DEV_USER_ID;
-        headers['x-dev-line-user-id'] = devUserId;
-    }
+    // 本番環境では実際のLIFF SDKを使用（開発用ヘッダー不要）
     
     try {
         const response = await fetch(CONFIG.API_BASE + endpoint, {
@@ -177,14 +172,6 @@ function initCollapsible() {
             const content = this.nextElementSibling;
             const isActive = this.classList.contains('active');
             
-            // 他の折りたたみを閉じる（必要に応じて）
-            // document.querySelectorAll('.collapsible-header.active').forEach(h => {
-            //     if (h !== this) {
-            //         h.classList.remove('active');
-            //         h.nextElementSibling.classList.remove('show');
-            //     }
-            // });
-            
             if (isActive) {
                 this.classList.remove('active');
                 content.classList.remove('show');
@@ -202,52 +189,10 @@ function getUrlParameter(name) {
     return urlParams.get(name);
 }
 
-// デバッグ用ユーティリティ
-if (CONFIG.isDev) {
-    window.debugLiff = {
-        // 現在のユーザー情報確認
-        async getCurrentUser() {
-            try {
-                const user = await getCurrentUser();
-                console.log('Current User:', user);
-                return user;
-            } catch (error) {
-                console.error('Error:', error);
-            }
-        },
-        
-        // イベント情報確認
-        async getEvent(eventId) {
-            try {
-                const response = await apiRequest(`/api/liff/events/${eventId}`);
-                const event = await response.json();
-                console.log('Event:', event);
-                return event;
-            } catch (error) {
-                console.error('Error:', error);
-            }
-        },
-        
-        // 設定確認
-        getConfig() {
-            console.log('Config:', CONFIG);
-            return CONFIG;
-        }
-    };
-    
-    console.log('🔧 LIFF Debug mode enabled. Use window.debugLiff for debugging.');
-}
-
 // ページ共通初期化
 document.addEventListener('DOMContentLoaded', function() {
     // 折りたたみ機能初期化
     initCollapsible();
-    
-    // 開発環境でのデバッグ情報表示
-    if (CONFIG.isDev) {
-        console.log('🚀 LIFF App loaded in development mode');
-        console.log('📱 Test User ID:', CONFIG.DEV_USER_ID);
-    }
 });
 
 // エクスポート（モジュールとして使う場合）
