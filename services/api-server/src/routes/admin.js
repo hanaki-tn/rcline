@@ -859,7 +859,7 @@ router.post('/events', requireAuth, upload.single('image'), [
               console.log(`[LIVE] LINE送信開始: イベントID=${eventId}, 対象=${memberIds.length}名`);
               
               // イベント情報とメンバー情報を取得
-              const eventSql = 'SELECT title, description, event_date, image_path FROM events WHERE id = ?';
+              const eventSql = 'SELECT title, event_date, image_path FROM events WHERE id = ?';
               req.db.get(eventSql, [eventId], (err, event) => {
                 if (err) {
                   req.db.run('ROLLBACK');
