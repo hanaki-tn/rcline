@@ -6,6 +6,23 @@ import bcrypt from 'bcryptjs';
 const DB_PATH = process.env.DATABASE_PATH || '/app/data/rcline.db';
 const SCHEMA_PATH = './db/schema.sql';
 
+// === 安全装置 ===
+console.log('========================================');
+console.log('       DB初期化スクリプト');
+console.log('========================================');
+console.log('実行日時:', new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }));
+console.log('警告: このスクリプトは全データベースを削除して初期化します');
+console.log('');
+console.log('実行するには以下の手順に従ってください:');
+console.log('1. このファイル内の "process.exit(1)" 行をコメントアウト');
+console.log('2. スクリプトを再実行');
+console.log('');
+console.log('本番環境では絶対に実行しないでください！');
+console.log('========================================');
+
+// この行をコメントアウトして実行してください
+process.exit(1);
+
 // JSTの現在時刻をISO8601で取得
 function nowJST() {
   return new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Tokyo' }).replace(' ', 'T') + '+09:00';

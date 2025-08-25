@@ -1,7 +1,7 @@
 awf.technavigation.jp {
     # 画像ファイル公開
     handle_path /files/* {
-        root * /var/www
+        root * /var/www/files
         file_server
     }
 

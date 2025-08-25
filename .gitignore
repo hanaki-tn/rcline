@@ -17,6 +17,10 @@ docker-compose.yml.backup*
 rcline.db
 *.db-journal
 
+# バックアップファイル（本番データ保護）
+backups/
+!backups/.gitkeep
+
 # ログファイル
 logs/
 *.ndjson

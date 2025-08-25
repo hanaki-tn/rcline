@@ -13,7 +13,7 @@ services:
     volumes:
       - ./rcline.db:/app/data/rcline.db
       - ./logs:/app/logs
-      - /var/www/files:/app/files  # ファイルアップロード用（修正）
+      - /var/www/files:/app/files  # ファイルアップロード用
     depends_on:
       - redis
     env_file:
