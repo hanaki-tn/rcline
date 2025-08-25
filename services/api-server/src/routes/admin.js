@@ -7,6 +7,7 @@ import sharp from 'sharp';
 import path from 'path';
 import fs from 'fs/promises';
 import { v4 as uuidv4 } from 'uuid';
+import axios from 'axios';
 
 const router = express.Router();
 
@@ -854,12 +855,163 @@ router.post('/events', requireAuth, upload.single('image'), [
                 });
               });
             } else {
-              // TODO: 実際の LINE 送信処理をここに実装
-              req.db.run('COMMIT');
-              resolve({
-                event_id: eventId,
-                targets: memberIds.length,
-                push: { success: 0, fail: 0, note: 'LINE送信機能は未実装' }
+              // 実際の LINE 送信処理
+              console.log(`[LIVE] LINE送信開始: イベントID=${eventId}, 対象=${memberIds.length}名`);
+              
+              // イベント情報とメンバー情報を取得
+              const eventSql = 'SELECT title, description, event_date, image_path FROM events WHERE id = ?';
+              req.db.get(eventSql, [eventId], (err, event) => {
+                if (err) {
+                  req.db.run('ROLLBACK');
+                  return reject(err);
+                }
+                
+                // 対象メンバーのline_user_idを取得
+                const memberSql = `SELECT line_user_id FROM members WHERE id IN (${memberIds.map(() => '?').join(',')})`;
+                req.db.all(memberSql, memberIds, async (err, members) => {
+                  if (err) {
+                    req.db.run('ROLLBACK');
+                    return reject(err);
+                  }
+                  
+                  const lineUserIds = members.map(m => m.line_user_id).filter(Boolean);
+                  console.log(`[LIVE] LINE送信対象: ${lineUserIds.length}名`);
+                  
+                  if (lineUserIds.length === 0) {
+                    req.db.run('COMMIT');
+                    return resolve({
+                      event_id: eventId,
+                      targets: memberIds.length,
+                      push: { success: 0, fail: 0, note: 'LINE連携済みメンバーなし' }
+                    });
+                  }
+                  
+                  // LIFFメッセージを構築
+                  const liffUrl = `https://awf.technavigation.jp/rcline/?eventId=${eventId}`;
+                  const message = {
+                    type: 'flex',
+                    altText: `${event.title} - 出欠確認`,
+                    contents: {
+                      type: 'bubble',
+                      hero: event.image_path ? {
+                        type: 'image',
+                        url: `${process.env.FILES_PUBLIC_URL_BASE}/${event.image_path}`,
+                        size: 'full',
+                        aspectRatio: '20:13',
+                        aspectMode: 'cover'
+                      } : null,
+                      body: {
+                        type: 'box',
+                        layout: 'vertical',
+                        contents: [
+                          {
+                            type: 'text',
+                            text: event.title,
+                            weight: 'bold',
+                            size: 'lg'
+                          },
+                          {
+                            type: 'text',
+                            text: event.event_date,
+                            size: 'sm',
+                            color: '#666666',
+                            margin: 'md'
+                          }
+                        ]
+                      },
+                      footer: {
+                        type: 'box',
+                        layout: 'vertical',
+                        spacing: 'sm',
+                        contents: [
+                          {
+                            type: 'button',
+                            style: 'primary',
+                            height: 'sm',
+                            action: {
+                              type: 'uri',
+                              label: '出欠を回答',
+                              uri: liffUrl
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  };
+                  
+                  // hero画像がない場合は削除
+                  if (!event.image_path) {
+                    delete message.contents.hero;
+                  }
+                  
+                  try {
+                    // LINE Messaging APIで送信
+                    const response = await axios.post('https://api.line.me/v2/bot/message/multicast', {
+                      to: lineUserIds,
+                      messages: [message]
+                    }, {
+                      headers: {
+                        'Authorization': `Bearer ${process.env.LINE_CHANNEL_ACCESS_TOKEN}`,
+                        'Content-Type': 'application/json'
+                      }
+                    });
+                    
+                    console.log(`[LIVE] LINE送信成功: ${lineUserIds.length}名`);
+                    
+                    // 送信統計を記録
+                    const statsSql = `
+                      INSERT OR REPLACE INTO event_push_stats (event_id, success_count, fail_count, last_sent_at)
+                      VALUES (?, ?, ?, ?)
+                    `;
+                    
+                    req.db.run(statsSql, [
+                      eventId,
+                      lineUserIds.length,
+                      0,
+                      nowJST()
+                    ], (err) => {
+                      if (err) {
+                        req.db.run('ROLLBACK');
+                        return reject(err);
+                      }
+                      
+                      req.db.run('COMMIT');
+                      resolve({
+                        event_id: eventId,
+                        targets: memberIds.length,
+                        push: { success: lineUserIds.length, fail: 0 }
+                      });
+                    });
+                    
+                  } catch (error) {
+                    console.error(`[LIVE] LINE送信エラー:`, error.response?.data || error.message);
+                    
+                    // エラー統計を記録
+                    const statsSql = `
+                      INSERT OR REPLACE INTO event_push_stats (event_id, success_count, fail_count, last_sent_at)
+                      VALUES (?, ?, ?, ?)
+                    `;
+                    
+                    req.db.run(statsSql, [
+                      eventId,
+                      0,
+                      lineUserIds.length,
+                      nowJST()
+                    ], (err) => {
+                      if (err) {
+                        req.db.run('ROLLBACK');
+                        return reject(err);
+                      }
+                      
+                      req.db.run('COMMIT');
+                      resolve({
+                        event_id: eventId,
+                        targets: memberIds.length,
+                        push: { success: 0, fail: lineUserIds.length, error: error.response?.data || error.message }
+                      });
+                    });
+                  }
+                });
               });
             }
           });
