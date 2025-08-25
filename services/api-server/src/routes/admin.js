@@ -859,7 +859,7 @@ router.post('/events', requireAuth, upload.single('image'), [
               console.log(`[LIVE] LINE送信開始: イベントID=${eventId}, 対象=${memberIds.length}名`);
               
               // イベント情報とメンバー情報を取得
-              const eventSql = 'SELECT title, event_date, image_path FROM events WHERE id = ?';
+              const eventSql = 'SELECT title, held_at, image_url FROM events WHERE id = ?';
               req.db.get(eventSql, [eventId], (err, event) => {
                 if (err) {
                   req.db.run('ROLLBACK');
@@ -893,9 +893,9 @@ router.post('/events', requireAuth, upload.single('image'), [
                     altText: `${event.title} - 出欠確認`,
                     contents: {
                       type: 'bubble',
-                      hero: event.image_path ? {
+                      hero: event.image_url ? {
                         type: 'image',
-                        url: `${process.env.FILES_PUBLIC_URL_BASE}/${event.image_path}`,
+                        url: event.image_url,
                         size: 'full',
                         aspectRatio: '20:13',
                         aspectMode: 'cover'
@@ -912,7 +912,7 @@ router.post('/events', requireAuth, upload.single('image'), [
                           },
                           {
                             type: 'text',
-                            text: event.event_date,
+                            text: event.held_at,
                             size: 'sm',
                             color: '#666666',
                             margin: 'md'
@@ -940,7 +940,7 @@ router.post('/events', requireAuth, upload.single('image'), [
                   };
                   
                   // hero画像がない場合は削除
-                  if (!event.image_path) {
+                  if (!event.image_url) {
                     delete message.contents.hero;
                   }
                   
