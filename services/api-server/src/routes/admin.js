@@ -538,7 +538,7 @@ router.get('/events/:id', requireAuth, (req, res) => {
     
     // 送信統計取得
     const statsSql = `
-      SELECT success_count, fail_count, (success_count + fail_count) as total_count, updated_at as last_sent_at
+      SELECT success_count, fail_count, (success_count + fail_count) as total_count, last_sent_at
       FROM event_push_stats
       WHERE event_id = ?
     `;
@@ -831,7 +831,7 @@ router.post('/events', requireAuth, upload.single('image'), [
               
               // 模擬送信統計を作成
               const statsSql = `
-                INSERT OR REPLACE INTO event_push_stats (event_id, success_count, fail_count, updated_at)
+                INSERT OR REPLACE INTO event_push_stats (event_id, success_count, fail_count, last_sent_at)
                 VALUES (?, ?, ?, ?)
               `;
               
