@@ -13,6 +13,9 @@ import { lineRoutes } from './routes/line.js';
 const app = express();
 const PORT = process.env.PORT || 4000;
 
+// プロキシ設定（Caddy経由のため）
+app.set('trust proxy', 1);
+
 // ミドルウェア
 app.use(helmet({
   contentSecurityPolicy: {
@@ -42,9 +45,10 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: process.env.NODE_ENV === 'production',
+    secure: process.env.NODE_ENV === 'production', // HTTPS必須
     httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000 // 24時間
+    maxAge: 24 * 60 * 60 * 1000, // 24時間
+    sameSite: 'lax' // CSRF対策
   }
 }));
 
