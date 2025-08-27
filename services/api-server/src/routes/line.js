@@ -74,11 +74,10 @@ function verifySignature(body, channelSecret, signature) {
       .update(bodyStr)
       .digest('base64');
     
-    const expectedSignature = `SHA256=${hash}`;
-    const isValid = signature === expectedSignature;
+    const isValid = signature === hash;
     
     if (!isValid) {
-      console.error(`[${new Date().toISOString()}] ERROR: 署名不一致 - 受信: ${signature}, 期待: ${expectedSignature}, body長: ${bodyStr.length}`);
+      console.error(`[${new Date().toISOString()}] ERROR: 署名不一致 - 受信: ${signature}, 期待: ${hash}, body長: ${bodyStr.length}`);
     }
     
     return isValid;
