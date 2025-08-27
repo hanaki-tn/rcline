@@ -44,6 +44,8 @@ function writeLog(logData) {
 export async function linkFollowProcessor(data) {
   const { mode, userId, replyToken, eventTs } = data;
   
+  console.log(`[FOLLOW_PROCESSOR_START] userId: ${userId}, mode: ${mode}, eventTs: ${eventTs}`);
+  
   // 24時間以内のイベントのみ処理
   const now = Date.now();
   if (now - eventTs > 24 * 60 * 60 * 1000) {
