@@ -8,29 +8,80 @@ const CONFIG = {
     LIFF_ID: '2007866921-LkR3yg4k'  // 出欠状況確認LIFF ID
 };
 
+// ★ デバッグログ表示機能（画面上）
+function showDebugLog(message, type = 'info') {
+    const debugArea = document.getElementById('debug-log') || createDebugArea();
+    const timestamp = new Date().toLocaleTimeString();
+    const logEntry = document.createElement('div');
+    logEntry.className = `debug-entry debug-${type}`;
+    logEntry.innerHTML = `[${timestamp}] ${type.toUpperCase()}: ${message}`;
+    debugArea.appendChild(logEntry);
+    debugArea.scrollTop = debugArea.scrollHeight;
+    
+    // 通常のconsole.logも維持
+    console.log(`[DEBUG] ${message}`);
+}
+
+function createDebugArea() {
+    const debugArea = document.createElement('div');
+    debugArea.id = 'debug-log';
+    debugArea.style.cssText = `
+        position: fixed; bottom: 0; left: 0; right: 0; height: 200px;
+        background: #000; color: #0f0; font-family: monospace; font-size: 10px;
+        overflow-y: scroll; z-index: 9999; border-top: 2px solid #0f0;
+        padding: 5px; box-sizing: border-box;
+    `;
+    
+    // 閉じるボタン追加
+    const closeBtn = document.createElement('button');
+    closeBtn.innerHTML = '×';
+    closeBtn.style.cssText = `
+        position: absolute; top: 2px; right: 5px; background: #f00; color: #fff;
+        border: none; width: 20px; height: 16px; cursor: pointer; font-size: 12px;
+    `;
+    closeBtn.onclick = () => debugArea.style.display = 'none';
+    debugArea.appendChild(closeBtn);
+    
+    document.body.appendChild(debugArea);
+    showDebugLog('デバッグログ開始', 'system');
+    return debugArea;
+}
+
 // LIFF初期化
 let liffInitialized = false;
 async function initLiff() {
     if (liffInitialized) return true;
     
     try {
-        console.log(`[${new Date().toISOString()}] INFO: LIFF初期化開始 - ID: ${CONFIG.LIFF_ID}`);
+        showDebugLog(`LIFF初期化開始 - ID: ${CONFIG.LIFF_ID}`, 'info');
+        
+        // LIFF SDKの存在確認
+        if (typeof liff === 'undefined') {
+            showDebugLog('LIFF SDK未読み込み', 'error');
+            throw new Error('LIFF SDK not loaded');
+        }
+        
+        showDebugLog('LIFF SDK読み込み確認OK', 'success');
         
         await liff.init({ liffId: CONFIG.LIFF_ID });
+        showDebugLog('liff.init()完了', 'success');
+        
         await liff.ready; // ★ 初期化完了を待つ
+        showDebugLog('liff.ready完了', 'success');
         liffInitialized = true;
         
         if (!liff.isLoggedIn()) {
-            console.log(`[${new Date().toISOString()}] INFO: LINEログイン未完了 - ログイン画面へ遷移`);
+            showDebugLog('LINEログイン未完了 - ログイン画面へ遷移', 'warn');
             liff.login();
             return false;
         }
         
-        console.log(`[${new Date().toISOString()}] INFO: LIFF初期化完了 - ログイン済み`);
+        showDebugLog('LIFF初期化完了 - ログイン済み', 'success');
         return true;
         
     } catch (error) {
-        console.error(`[${new Date().toISOString()}] ERROR: LIFF初期化失敗:`, error);
+        showDebugLog(`LIFF初期化失敗: ${error.message}`, 'error');
+        showDebugLog(`エラー詳細: ${error.stack}`, 'error');
         throw error;
     }
 }
@@ -38,15 +89,39 @@ async function initLiff() {
 // ★ プロフィールを1度だけ取得して userId をキャッシュ
 let cachedUserId = null;
 async function ensureLineUserId() {
-    if (!liffInitialized) {
-        const ok = await initLiff();
-        if (!ok) return null; // ログイン遷移
+    try {
+        showDebugLog('ensureLineUserId開始', 'info');
+        
+        if (!liffInitialized) {
+            showDebugLog('LIFF未初期化 - initLiff実行', 'info');
+            const ok = await initLiff();
+            if (!ok) {
+                showDebugLog('initLiff失敗 - ログイン遷移中', 'warn');
+                return null; // ログイン遷移
+            }
+        }
+        
+        if (!liff.isLoggedIn()) {
+            showDebugLog('LIFFログイン状態がfalse', 'warn');
+            return null;
+        }
+        
+        if (cachedUserId) {
+            showDebugLog(`キャッシュからuserId取得: ${cachedUserId}`, 'info');
+            return cachedUserId;
+        }
+        
+        showDebugLog('liff.getProfile()実行中', 'info');
+        const profile = await liff.getProfile();
+        cachedUserId = profile?.userId || null;
+        showDebugLog(`プロフィール取得完了: ${cachedUserId}`, 'success');
+        
+        return cachedUserId;
+        
+    } catch (error) {
+        showDebugLog(`ensureLineUserId失敗: ${error.message}`, 'error');
+        return null;
     }
-    if (!liff.isLoggedIn()) return null;
-    if (cachedUserId) return cachedUserId;
-    const profile = await liff.getProfile();
-    cachedUserId = profile?.userId || null;
-    return cachedUserId;
 }
 
 // API リクエストヘルパー
@@ -58,32 +133,51 @@ async function apiRequest(endpoint, options = {}) {
     
     // VPS環境では LIFF からトークン取得（任意）＋ ユーザーIDを必ず送る
     try {
+        showDebugLog(`APIリクエスト認証ヘッダ設定開始: ${endpoint}`, 'info');
+        
         if (liffInitialized && liff.isLoggedIn()) {
             const accessToken = liff.getAccessToken();
-            if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`; // あってもよい
+            if (accessToken) {
+                headers['Authorization'] = `Bearer ${accessToken.substring(0, 10)}...`; // 一部のみ表示
+                showDebugLog('アクセストークン設定完了', 'info');
+            }
         }
+        
         // ★ サーバ認証の本命：x-line-user-id を必ず付与
+        showDebugLog('LINE userId取得開始', 'info');
         const uid = await ensureLineUserId();
-        if (!uid) throw new Error('LINE user id not available');
+        if (!uid) {
+            showDebugLog('LINE user id取得失敗', 'error');
+            throw new Error('LINE user id not available');
+        }
         headers['x-line-user-id'] = uid;
+        showDebugLog(`x-line-user-id設定完了: ${uid}`, 'success');
+        
     } catch (error) {
-        console.warn(`[${new Date().toISOString()}] WARN: 認証ヘッダ設定で警告:`, error);
+        showDebugLog(`認証ヘッダ設定エラー: ${error.message}`, 'error');
+        throw error; // エラーを再スローしてAPIリクエスト停止
     }
     
     try {
+        showDebugLog(`fetch実行: ${CONFIG.API_BASE}${endpoint}`, 'info');
         const response = await fetch(CONFIG.API_BASE + endpoint, {
             ...options,
             headers
         });
         
+        showDebugLog(`fetch応答: ${response.status} ${response.statusText}`, response.ok ? 'success' : 'error');
+        
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
+            showDebugLog(`APIエラー詳細: ${JSON.stringify(errorData)}`, 'error');
             throw new Error(errorData.message || `HTTP ${response.status}`);
         }
         
+        showDebugLog(`APIリクエスト成功: ${endpoint}`, 'success');
         return response;
+        
     } catch (error) {
-        console.error(`API Error [${endpoint}]:`, error);
+        showDebugLog(`fetch失敗: ${error.message}`, 'error');
         throw error;
     }
 }
@@ -91,22 +185,24 @@ async function apiRequest(endpoint, options = {}) {
 // 現在のユーザー情報を取得
 async function getCurrentUser() {
     try {
-        console.log(`[${new Date().toISOString()}] INFO: ユーザー情報取得開始`);
+        showDebugLog('getCurrentUser開始', 'info');
         
         const uid = await ensureLineUserId();
         if (!uid) {
-            console.log(`[${new Date().toISOString()}] INFO: LINE認証が必要です`);
+            showDebugLog('LINE認証が必要です', 'warn');
             return null; // ログイン遷移中
         }
         
+        showDebugLog('LIFFプロフィール再取得開始', 'info');
         const profile = await liff.getProfile();
-        console.log(`[${new Date().toISOString()}] INFO: LIFFプロフィール取得成功 - userId: ${profile.userId}`);
+        showDebugLog(`LIFFプロフィール取得成功 - userId: ${profile.userId}, name: ${profile.displayName}`, 'success');
         
         // APIサーバーからメンバー情報を取得
+        showDebugLog('APIサーバーからメンバー情報取得開始', 'info');
         const response = await apiRequest('/api/liff/me');
         const userData = await response.json();
         
-        console.log(`[${new Date().toISOString()}] INFO: ユーザー情報取得完了 - member_id: ${userData.member_id || 'N/A'}`);
+        showDebugLog(`メンバー情報取得完了 - member_id: ${userData.member_id || 'N/A'}`, 'success');
         
         return {
             ...userData,
@@ -114,7 +210,7 @@ async function getCurrentUser() {
         };
         
     } catch (error) {
-        console.error(`[${new Date().toISOString()}] ERROR: ユーザー情報取得エラー:`, error);
+        showDebugLog(`getCurrentUser失敗: ${error.message}`, 'error');
         return null;
     }
 }
