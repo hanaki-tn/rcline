@@ -4,8 +4,35 @@
 const CONFIG = {
     API_BASE: '/rcline',  // VPS用パス
     DEV_USER_ID: 'U45bc8ea2cb931b9ff43aa41559dbc7fc',
-    isDev: false  // 本番環境
+    isDev: false,  // 本番環境
+    LIFF_ID: '2007866921-LkR3yg4k'  // 出欠状況確認LIFF ID
 };
+
+// LIFF初期化
+let liffInitialized = false;
+async function initLiff() {
+    if (liffInitialized) return true;
+    
+    try {
+        console.log(`[${new Date().toISOString()}] INFO: LIFF初期化開始 - ID: ${CONFIG.LIFF_ID}`);
+        
+        await liff.init({ liffId: CONFIG.LIFF_ID });
+        liffInitialized = true;
+        
+        if (!liff.isLoggedIn()) {
+            console.log(`[${new Date().toISOString()}] INFO: LINEログイン未完了 - ログイン画面へ遷移`);
+            liff.login();
+            return false;
+        }
+        
+        console.log(`[${new Date().toISOString()}] INFO: LIFF初期化完了 - ログイン済み`);
+        return true;
+        
+    } catch (error) {
+        console.error(`[${new Date().toISOString()}] ERROR: LIFF初期化失敗:`, error);
+        throw error;
+    }
+}
 
 // API リクエストヘルパー
 async function apiRequest(endpoint, options = {}) {
@@ -14,7 +41,19 @@ async function apiRequest(endpoint, options = {}) {
         ...options.headers
     };
     
-    // 本番環境では実際のLIFF SDKを使用（開発用ヘッダー不要）
+    // VPS環境では実際のLIFF SDKからLINE user IDを取得
+    try {
+        if (liffInitialized && liff.isLoggedIn()) {
+            // LIFFからアクセストークンを取得してヘッダーに設定
+            const accessToken = liff.getAccessToken();
+            if (accessToken) {
+                headers['Authorization'] = `Bearer ${accessToken}`;
+                console.log(`[${new Date().toISOString()}] INFO: LIFF access token取得成功`);
+            }
+        }
+    } catch (error) {
+        console.warn(`[${new Date().toISOString()}] WARN: LIFF access token取得失敗:`, error);
+    }
     
     try {
         const response = await fetch(CONFIG.API_BASE + endpoint, {
@@ -37,10 +76,34 @@ async function apiRequest(endpoint, options = {}) {
 // 現在のユーザー情報を取得
 async function getCurrentUser() {
     try {
+        console.log(`[${new Date().toISOString()}] INFO: ユーザー情報取得開始`);
+        
+        // LIFF初期化確認
+        if (!liffInitialized) {
+            const initialized = await initLiff();
+            if (!initialized) {
+                console.log(`[${new Date().toISOString()}] INFO: LIFF未初期化のため処理中断`);
+                return null;
+            }
+        }
+        
+        // LIFFプロフィール情報を取得
+        const profile = await liff.getProfile();
+        console.log(`[${new Date().toISOString()}] INFO: LIFFプロフィール取得成功 - userId: ${profile.userId}`);
+        
+        // APIサーバーからメンバー情報を取得
         const response = await apiRequest('/api/liff/me');
-        return await response.json();
+        const userData = await response.json();
+        
+        console.log(`[${new Date().toISOString()}] INFO: ユーザー情報取得完了 - member_id: ${userData.member_id || 'N/A'}`);
+        
+        return {
+            ...userData,
+            lineProfile: profile
+        };
+        
     } catch (error) {
-        console.error('ユーザー情報取得エラー:', error);
+        console.error(`[${new Date().toISOString()}] ERROR: ユーザー情報取得エラー:`, error);
         return null;
     }
 }
