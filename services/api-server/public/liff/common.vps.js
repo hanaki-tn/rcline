@@ -17,6 +17,7 @@ async function initLiff() {
         console.log(`[${new Date().toISOString()}] INFO: LIFF初期化開始 - ID: ${CONFIG.LIFF_ID}`);
         
         await liff.init({ liffId: CONFIG.LIFF_ID });
+        await liff.ready; // ★ 初期化完了を待つ
         liffInitialized = true;
         
         if (!liff.isLoggedIn()) {
@@ -34,6 +35,20 @@ async function initLiff() {
     }
 }
 
+// ★ プロフィールを1度だけ取得して userId をキャッシュ
+let cachedUserId = null;
+async function ensureLineUserId() {
+    if (!liffInitialized) {
+        const ok = await initLiff();
+        if (!ok) return null; // ログイン遷移
+    }
+    if (!liff.isLoggedIn()) return null;
+    if (cachedUserId) return cachedUserId;
+    const profile = await liff.getProfile();
+    cachedUserId = profile?.userId || null;
+    return cachedUserId;
+}
+
 // API リクエストヘルパー
 async function apiRequest(endpoint, options = {}) {
     const headers = {
@@ -41,18 +56,18 @@ async function apiRequest(endpoint, options = {}) {
         ...options.headers
     };
     
-    // VPS環境では実際のLIFF SDKからLINE user IDを取得
+    // VPS環境では LIFF からトークン取得（任意）＋ ユーザーIDを必ず送る
     try {
         if (liffInitialized && liff.isLoggedIn()) {
-            // LIFFからアクセストークンを取得してヘッダーに設定
             const accessToken = liff.getAccessToken();
-            if (accessToken) {
-                headers['Authorization'] = `Bearer ${accessToken}`;
-                console.log(`[${new Date().toISOString()}] INFO: LIFF access token取得成功`);
-            }
+            if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`; // あってもよい
         }
+        // ★ サーバ認証の本命：x-line-user-id を必ず付与
+        const uid = await ensureLineUserId();
+        if (!uid) throw new Error('LINE user id not available');
+        headers['x-line-user-id'] = uid;
     } catch (error) {
-        console.warn(`[${new Date().toISOString()}] WARN: LIFF access token取得失敗:`, error);
+        console.warn(`[${new Date().toISOString()}] WARN: 認証ヘッダ設定で警告:`, error);
     }
     
     try {
@@ -78,16 +93,12 @@ async function getCurrentUser() {
     try {
         console.log(`[${new Date().toISOString()}] INFO: ユーザー情報取得開始`);
         
-        // LIFF初期化確認
-        if (!liffInitialized) {
-            const initialized = await initLiff();
-            if (!initialized) {
-                console.log(`[${new Date().toISOString()}] INFO: LIFF未初期化のため処理中断`);
-                return null;
-            }
+        const uid = await ensureLineUserId();
+        if (!uid) {
+            console.log(`[${new Date().toISOString()}] INFO: LINE認証が必要です`);
+            return null; // ログイン遷移中
         }
         
-        // LIFFプロフィール情報を取得
         const profile = await liff.getProfile();
         console.log(`[${new Date().toISOString()}] INFO: LIFFプロフィール取得成功 - userId: ${profile.userId}`);
         
