@@ -1,4 +1,14 @@
 awf.technavigation.jp {
+    # アクセスログ有効化（LIFF SDK読み込み確認用）
+    log {
+        output file /var/log/caddy/access.log
+        format json {
+            time_format "iso8601"
+            message "{request>method} {request>uri} -> {response>status} ({response>size} bytes) [{request>headers>User-Agent>[0]}]"
+        }
+        level INFO
+    }
+    
     # 画像ファイル公開
     handle_path /files/* {
         root * /var/www/files
