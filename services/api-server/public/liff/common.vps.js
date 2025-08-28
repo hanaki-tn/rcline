@@ -55,9 +55,26 @@ async function initLiff() {
     try {
         showDebugLog(`LIFF初期化開始 - ID: ${CONFIG.LIFF_ID}`, 'info');
         
+        // LIFF SDKの読み込み診断
+        showDebugLog(`window.liffSdkLoaded: ${window.liffSdkLoaded}`, 'info');
+        showDebugLog(`window.liffSdkLoadError: ${window.liffSdkLoadError}`, 'info');
+        showDebugLog(`typeof liff: ${typeof liff}`, 'info');
+        
+        // スクリプトタグの存在確認
+        const liffScripts = document.querySelectorAll('script[src*="liff"]');
+        showDebugLog(`LIFF関連script要素数: ${liffScripts.length}`, 'info');
+        liffScripts.forEach((script, index) => {
+            showDebugLog(`Script ${index + 1}: ${script.src} (loaded: ${script.readyState})`, 'info');
+        });
+        
         // LIFF SDKの存在確認
         if (typeof liff === 'undefined') {
             showDebugLog('LIFF SDK未読み込み', 'error');
+            if (window.liffSdkLoadError) {
+                showDebugLog('SDK読み込みでonerrorが発生', 'error');
+            } else if (!window.liffSdkLoaded) {
+                showDebugLog('SDKのonloadイベント未発火', 'error');
+            }
             throw new Error('LIFF SDK not loaded');
         }
         
@@ -138,8 +155,8 @@ async function apiRequest(endpoint, options = {}) {
         if (liffInitialized && liff.isLoggedIn()) {
             const accessToken = liff.getAccessToken();
             if (accessToken) {
-                headers['Authorization'] = `Bearer ${accessToken.substring(0, 10)}...`; // 一部のみ表示
-                showDebugLog('アクセストークン設定完了', 'info');
+                headers['Authorization'] = `Bearer ${accessToken}`;
+                showDebugLog(`アクセストークン設定完了: ${accessToken ? accessToken.substring(0, 10) + '...' : 'N/A'}`, 'info');
             }
         }
         

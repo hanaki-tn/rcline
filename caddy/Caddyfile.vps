@@ -22,6 +22,11 @@ awf.technavigation.jp {
         root * /opt/rcline/services/api-server/public
         try_files {path} /index.html
         file_server
+        
+        # LIFF SDK読み込み用CSP設定
+        header {
+            Content-Security-Policy "default-src 'self'; script-src 'self' https://static.line-scdn.net 'unsafe-inline'; connect-src 'self' https://awf.technavigation.jp; img-src 'self' data:; style-src 'self' 'unsafe-inline'"
+        }
     }
 
     # 従来のAPI（互換性維持）

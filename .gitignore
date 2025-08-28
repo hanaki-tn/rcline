@@ -7,6 +7,7 @@ node_modules
 dist
 *.log
 .DS_Store
+018_LINE_Developers設定情報.md
 
 # VPS運用ファイル（バックアップ）
 *.backup.*

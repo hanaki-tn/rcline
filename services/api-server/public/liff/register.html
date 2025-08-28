@@ -110,7 +110,12 @@
         }
     </style>
     <!-- LIFF SDK -->
-    <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <script
+        charset="utf-8"
+        src="https://static.line-scdn.net/liff/edge/2/sdk.js"
+        onload="console.log('LIFF SDK loaded'); window.liffSdkLoaded = true;"
+        onerror="console.error('LIFF SDK load FAILED'); window.liffSdkLoadError = true;">
+    </script>
 </head>
 <body>
     <div class="container">
