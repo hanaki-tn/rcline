@@ -8,21 +8,30 @@ const router = express.Router();
 
 // LIFF認証ミドルウェア
 function requireLineUser(req, res, next) {
+  console.log(`[${new Date().toISOString()}] INFO: LIFF認証開始 - Headers:`, {
+    'x-line-user-id': req.headers['x-line-user-id'],
+    'x-dev-line-user-id': req.headers['x-dev-line-user-id'],
+    'user-agent': req.headers['user-agent']
+  });
+  
   // 本番環境では x-line-user-id ヘッダー使用
   let userId = req.headers['x-line-user-id'];
   
   // 開発環境では x-dev-line-user-id ヘッダーも許可
   if (!userId && process.env.NODE_ENV === 'development') {
     userId = req.headers['x-dev-line-user-id'];
+    console.log(`[${new Date().toISOString()}] INFO: 開発モードでuser-id取得: ${userId}`);
   }
   
   if (!userId) {
+    console.error(`[${new Date().toISOString()}] ERROR: LIFF認証失敗 - LINE user IDが見つかりません`);
     return res.status(401).json({
       code: 'UNAUTHENTICATED',
       message: 'LINE user ID required'
     });
   }
   
+  console.log(`[${new Date().toISOString()}] INFO: LIFF認証成功 - userId: ${userId}`);
   req.lineUserId = userId;
   next();
 }
@@ -143,6 +152,7 @@ router.post('/register', requireLineUser, async (req, res) => {
 
 // イベント一覧（自分が対象）
 router.get('/events', requireLineUser, async (req, res) => {
+  console.log(`[${new Date().toISOString()}] INFO: /api/liff/events アクセス - userId: ${req.lineUserId}`);
   try {
     const member = await getMemberByLineUserId(req.db, req.lineUserId);
     
