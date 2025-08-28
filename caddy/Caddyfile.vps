@@ -20,8 +20,8 @@ awf.technavigation.jp {
     # RC LINE LIFF画面
     handle_path /rcline/* {
         root * /opt/rcline/services/api-server/public
-        file_server
         try_files {path} /index.html
+        file_server
     }
 
     # 従来のAPI（互換性維持）

@@ -44,10 +44,11 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
-      - /var/www:/var/www  # 静的ファイル用
+      - ./services/api-server/public:/opt/rcline/services/api-server/public:ro # 静的ファイル用
+#      - /var/www:/var/www  # 静的ファイル用
     depends_on:
       - api-server
       - linehook
