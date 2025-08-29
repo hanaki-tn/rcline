@@ -109,13 +109,6 @@
             display: none;
         }
     </style>
-    <!-- LIFF SDK -->
-    <script
-        charset="utf-8"
-        src="https://static.line-scdn.net/liff/edge/2/sdk.js"
-        onload="console.log('LIFF SDK loaded'); window.liffSdkLoaded = true;"
-        onerror="console.error('LIFF SDK load FAILED'); window.liffSdkLoadError = true;">
-    </script>
 </head>
 <body>
     <div class="container">
@@ -178,7 +171,6 @@
         </div>
     </div>
 
-    <script src="common.js"></script>
     <script>
         // URLパラメータ取得
         const urlParams = new URLSearchParams(window.location.search);
@@ -387,5 +379,14 @@
         // ページ読み込み時の処理
         document.addEventListener('DOMContentLoaded', initPage);
     </script>
+    
+    <!-- LIFF SDK (body終了直前に配置) -->
+    <script
+        charset="utf-8"
+        src="https://static.line-scdn.net/liff/edge/2/sdk.js"
+        onload="console.log('LIFF SDK loaded'); window.liffSdkLoaded = true;"
+        onerror="console.error('LIFF SDK load FAILED'); window.liffSdkLoadError = true;">
+    </script>
+    <script src="common.js"></script>
 </body>
 </html>

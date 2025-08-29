@@ -25,3 +25,6 @@ backups/
 # ログファイル
 logs/
 *.ndjson
+
+# 参考資料（メインプロジェクトには含めない）
+reference/

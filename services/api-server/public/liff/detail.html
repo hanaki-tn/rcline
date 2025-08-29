@@ -5,13 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>イベント詳細 - RC公式LINE</title>
     <link rel="stylesheet" href="common.css">
-    <!-- LIFF SDK -->
-    <script
-        charset="utf-8"
-        src="https://static.line-scdn.net/liff/edge/2/sdk.js"
-        onload="console.log('LIFF SDK loaded'); window.liffSdkLoaded = true;"
-        onerror="console.error('LIFF SDK load FAILED'); window.liffSdkLoadError = true;">
-    </script>
 </head>
 <body>
     <div class="container">
@@ -37,7 +30,6 @@
         <div id="dev-info" class="d-none"></div>
     </div>
 
-    <script src="common.js"></script>
     <script>
         // イベントデータ
         let currentUser = null;
@@ -409,5 +401,14 @@
             color: #495057;
         }
     </style>
+    
+    <!-- LIFF SDK (body終了直前に配置) -->
+    <script
+        charset="utf-8"
+        src="https://static.line-scdn.net/liff/edge/2/sdk.js"
+        onload="console.log('LIFF SDK loaded'); window.liffSdkLoaded = true;"
+        onerror="console.error('LIFF SDK load FAILED'); window.liffSdkLoadError = true;">
+    </script>
+    <script src="common.js"></script>
 </body>
 </html>
