@@ -5,11 +5,18 @@ const CONFIG = {
     API_BASE: '/rcline',  // VPS用パス
     DEV_USER_ID: 'U45bc8ea2cb931b9ff43aa41559dbc7fc',
     isDev: false,  // 本番環境
-    LIFF_ID: '2007866921-LkR3yg4k'  // 出欠状況確認LIFF ID
+    LIFF_ID: '2007866921-LkR3yg4k',  // 出欠状況確認LIFF ID
+    showDebugUI: false  // 画面デバッグを出すか（?debug=1で上書き可能）
 };
 
 // ★ デバッグログ表示機能（画面上）
 function showDebugLog(message, type = 'info') {
+    // 画面UIは条件付き。コンソールは常に維持。
+    const allowUI = CONFIG.showDebugUI || /(^|[?&])debug=1(&|$)/.test(location.search);
+    console.log(`[DEBUG] ${message}`);
+
+    if (!allowUI) return; // 本番ではUIを出さない
+
     const debugArea = document.getElementById('debug-log') || createDebugArea();
     const timestamp = new Date().toLocaleTimeString();
     const logEntry = document.createElement('div');
@@ -17,9 +24,6 @@ function showDebugLog(message, type = 'info') {
     logEntry.innerHTML = `[${timestamp}] ${type.toUpperCase()}: ${message}`;
     debugArea.appendChild(logEntry);
     debugArea.scrollTop = debugArea.scrollHeight;
-    
-    // 通常のconsole.logも維持
-    console.log(`[DEBUG] ${message}`);
 }
 
 function createDebugArea() {
