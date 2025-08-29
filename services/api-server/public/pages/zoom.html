@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>例会Zoom参加のご案内 | 浦和北東RC</title>
+  <meta name="description" content="公式LINEのリッチメニューから表示するZoomご案内ページ" />
+  <style>
+    :root {
+      --bg: #fff;
+      --fg: #0f172a;
+      --muted: #475569;
+      --accent: #2563eb;
+      --card: #f8fafc;
+      --border: #e2e8f0;
+      --radius: 16px;
+    }
+    html, body { height: 100%; }
+    body {
+      margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, "Hiragino Kaku Gothic ProN", "Yu Gothic", "Noto Sans JP", sans-serif;
+      background: var(--bg); color: var(--fg); line-height: 1.65; -webkit-text-size-adjust: 100%;
+    }
+    .container { max-width: 720px; margin: 0 auto; padding: 16px clamp(12px, 4vw, 24px) 28px; }
+    .cover { overflow: hidden; border-radius: 18px; border: 1px solid var(--border); background:#fff; }
+    .cover img { width: 100%; height: auto; display: block; }
+    header { padding: 14px 0 8px; }
+    h1 { margin: 10px 0 0; font-size: clamp(20px, 4.8vw, 26px); letter-spacing: .02em; }
+    .desc { color: var(--muted); font-size: 14px; margin-top: 4px; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin: 14px 0; }
+    h2 { font-size: 16px; margin: 0 0 8px; display: flex; align-items: center; gap: .5em; }
+    h3 { font-size: 15px; margin: 14px 0 6px; color: var(--muted); }
+    .kv { display: grid; grid-template-columns: 110px 1fr; gap: 10px; align-items: start; }
+    .kv .k { color: var(--muted); }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-size: 14px; word-break: break-all; }
+    .btns { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
+    .btn { appearance: none; border: 1px solid var(--border); background: #fff; border-radius: 999px; padding: 8px 14px; font-weight: 600; font-size: 14px; text-decoration: none; color: var(--fg); box-shadow: 0 1px 0 rgba(0,0,0,.03); }
+    .btn.primary { background: var(--accent); color: #fff; border-color: transparent; }
+    .btn:active { transform: translateY(1px); }
+    .tips li { margin: 6px 0; }
+    .muted { color: var(--muted); font-size: 13px; }
+    .footer-note { margin-top: 18px; color: var(--muted); font-size: 12px; }
+    .copywrap { display:flex; gap:8px; align-items:center; flex-wrap: wrap; }
+    .copywrap code { background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 6px 10px; }
+    .copy { border: 1px solid var(--border); background: var(--card); padding: 6px 10px; border-radius: 10px; font-size: 12px; }
+    .notice { background: #fff6e6; border: 1px solid #fde7b5; color: #7a4e00; padding: 10px 12px; border-radius: 12px; font-size: 13px; }
+    a { color: var(--accent); text-decoration: none; }
+    a:focus { outline: 2px solid var(--accent); outline-offset: 2px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- カバー画像 -->
+    <div class="cover">
+      <img src="https://awf.technavigation.jp/rcline/images/zoom_cover.webp" alt="例会Zoom参加のカバー画像" loading="lazy" />
+    </div>
+
+    <header>
+      <h1>例会Zoom参加のご案内</h1>
+    </header>
+
+    <!-- 参加リンク -->
+    <section class="card">
+      <h2>参加リンク</h2>
+      <div class="kv">
+        <div class="k">参加方法</div>
+        <div class="v btns">
+          <a id="openApp" class="btn primary" href="#" rel="nofollow">Zoomアプリで参加</a>
+          <a class="btn" id="openWeb" href="#">ブラウザで参加</a>
+        </div>
+      </div>
+      <p class="notice">※ 例会開始の<strong>10分前</strong>から入室できます。</p>
+      <p class="muted">※ Zoomの表示名はニックネームではなく、氏名など参加者にわかる名前で設定してください。</p>
+    </section>
+
+    <!-- ミーティング情報 -->
+    <section class="card">
+      <h2>ミーティング情報</h2>
+      <div class="kv">
+        <div class="k">Zoom URL</div>
+        <div class="v mono copywrap">
+          <code id="zoomUrl"></code>
+          <button class="copy" data-target="zoomUrl">コピー</button>
+        </div>
+        <div class="k">ミーティングID</div>
+        <div class="v mono copywrap"><code id="zoomId"></code><button class="copy" data-target="zoomId">コピー</button></div>
+        <div class="k">パスコード</div>
+        <div class="v mono copywrap"><code id="zoomPass"></code><button class="copy" data-target="zoomPass">コピー</button></div>
+      </div>
+    </section>
+
+    <!-- 参加手順 -->
+    <section class="card">
+      <h2>参加手順</h2>
+      <ol class="tips">
+        <li>上の「<strong>Zoomアプリで参加</strong>」または「<strong>ブラウザで参加</strong>」をタップします。</li>
+        <li>アプリが起動しない場合は、上記の<strong>ミーティングID</strong>と<strong>パスコード</strong>を手動で入力してください。</li>
+        <li>初回は音声やカメラのアクセス許可を求められる場合があります。</li>
+      </ol>
+    </section>
+
+    <!-- トラブル時の確認ポイント -->
+    <section class="card">
+      <h2>トラブル時の確認ポイント</h2>
+      <ul class="tips">
+        <li>マイクやカメラが正しく選択されているか</li>
+        <li>音量がミュートになっていないか</li>
+        <li>インターネット接続が安定しているか</li>
+        <li>音声や映像がうまく接続できない場合は、下記「アクセス方法（公式ガイド）」を参照してください。</li>
+      </ul>
+    </section>
+
+    <!-- アクセス方法（公式ガイド） -->
+    <section class="card">
+      <h2>アクセス方法（公式ガイド）</h2>
+      <ul class="tips">
+        <li>
+          <strong>ミーティングリンクから参加する方法（スマホ・PC共通）</strong><br>
+          <a href="https://support.zoom.com/hc/ja/article?id=zm_kb&sysparm_article=KB0065193" target="_blank" rel="noopener">Zoom公式：ミーティングリンクからの参加方法</a>
+        </li>
+        <li>
+          <strong>Zoomアプリから参加する方法（PC版・スマホ版）</strong><br>
+          <a href="https://support.zoom.com/hc/ja/article?id=zm_kb&sysparm_article=KB0060745" target="_blank" rel="noopener">Zoom公式：アプリからミーティングに参加する</a>
+        </li>
+        <li>
+          <strong>ブラウザで参加する方法（アプリをインストールせずに参加）</strong><br>
+          <a href="https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0064261" target="_blank" rel="noopener">Zoom公式：ブラウザでミーティングに参加する</a>
+        </li>
+      </ul>
+    </section>
+  </div>
+
+  <script>
+    // ▼ 実値を設定
+    const ZOOM_URL  = "https://us06web.zoom.us/j/2689377246?pwd=hbGzICbhuhaNigVOdIbxvAKvLaXsW5.1";
+    const ZOOM_ID   = "2689377246"; // digits only
+    const ZOOM_PASS = "urawa-ne";
+
+    // 表示用にIDを 3-3-4 でスペース区切り
+    const displayId = (ZOOM_ID.length === 10)
+      ? ZOOM_ID.replace(/(\d{3})(\d{3})(\d{4})/, "$1 $2 $3")
+      : ZOOM_ID;
+
+    // 反映
+    document.getElementById('zoomUrl').textContent = ZOOM_URL;
+    document.getElementById('zoomId').textContent  = displayId;
+    document.getElementById('zoomPass').textContent= ZOOM_PASS;
+
+    // 参加ボタン
+    document.getElementById('openWeb').href = ZOOM_URL;
+    const appScheme = `zoomus://zoom.us/join?action=join&confno=${encodeURIComponent(ZOOM_ID)}&pwd=${encodeURIComponent(ZOOM_PASS)}`;
+    document.getElementById('openApp').href = appScheme;
+
+    // コピー機能
+    document.querySelectorAll('.copy').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-target');
+        const text = document.getElementById(id)?.textContent || '';
+        navigator.clipboard.writeText(text).then(() => {
+          const prev = btn.textContent;
+          btn.textContent = 'コピーしました';
+          setTimeout(() => (btn.textContent = prev), 1200);
+        }).catch(() => {
+          alert('コピーできませんでした。長押しで選択してコピーしてください。');
+        });
+      });
+    });
+  </script>
+</body>
+</html>
