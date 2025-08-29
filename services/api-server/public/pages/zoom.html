@@ -21,7 +21,7 @@
       background: var(--bg); color: var(--fg); line-height: 1.65; -webkit-text-size-adjust: 100%;
     }
     .container { max-width: 720px; margin: 0 auto; padding: 16px clamp(12px, 4vw, 24px) 28px; }
-    .cover { overflow: hidden; border-radius: 18px; border: 1px solid var(--border); background:#fff; }
+    .cover { overflow: hidden; margin: -16px calc(-1 * clamp(12px, 4vw, 24px)) 0; }
     .cover img { width: 100%; height: auto; display: block; }
     header { padding: 14px 0 8px; }
     h1 { margin: 10px 0 0; font-size: clamp(20px, 4.8vw, 26px); letter-spacing: .02em; }
@@ -32,8 +32,8 @@
     .kv { display: grid; grid-template-columns: 110px 1fr; gap: 10px; align-items: start; }
     .kv .k { color: var(--muted); }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-size: 14px; word-break: break-all; }
-    .btns { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
-    .btns .btn { flex: 1; min-width: 0; text-align: center; }
+    .btns { display: flex; gap: 10px; margin-top: 8px; }
+    .btns .btn { flex: 1; text-align: center; white-space: nowrap; }
     .btn { appearance: none; border: 1px solid var(--border); background: #fff; border-radius: 999px; padding: 8px 14px; font-weight: 600; font-size: 14px; text-decoration: none; color: var(--fg); box-shadow: 0 1px 0 rgba(0,0,0,.03); }
     .btn.primary { background: var(--accent); color: #fff; border-color: transparent; }
     .btn:active { transform: translateY(1px); }
@@ -62,12 +62,9 @@
     <!-- 参加リンク -->
     <section class="card">
       <h2>参加リンク</h2>
-      <div class="kv">
-        <!-- <div class="k">参加方法</div> -->
-        <div class="v btns">
-          <a id="openApp" class="btn primary" href="#" rel="nofollow">Zoomアプリで参加</a>
-          <a class="btn" id="openWeb" href="#">ブラウザで参加</a>
-        </div>
+      <div class="btns">
+        <a id="openApp" class="btn primary" href="#" rel="nofollow">Zoomアプリで参加</a>
+        <a class="btn" id="openWeb" href="#">ブラウザで参加</a>
       </div>
       <p class="notice">※ 例会開始の<strong>10分前</strong>から入室できます。</p>
       <p class="muted">※ Zoomの表示名はニックネームではなく、参加者にわかる名前で設定してください。</p>
