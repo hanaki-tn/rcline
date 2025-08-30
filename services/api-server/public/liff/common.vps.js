@@ -1,5 +1,8 @@
 // RC公式LINE LIFF 共通JavaScript（VPS本番用）
 
+// 二重実行防止
+if (window.__RCL_INIT_LOCK__) { console.warn('INIT locked'); } else { window.__RCL_INIT_LOCK__ = true; }
+
 // 共通設定
 const CONFIG = {
     API_BASE: '/rcline',  // VPS用パス
@@ -89,15 +92,27 @@ async function initLiff() {
         
         await liff.ready; // ★ 初期化完了を待つ
         showDebugLog('liff.ready完了', 'success');
-        liffInitialized = true;
         
-        if (!liff.isLoggedIn()) {
-            showDebugLog('LINEログイン未完了 - ログイン画面へ遷移', 'warn');
-            liff.login();
-            return false;
+        // --- ログイン分岐ロジック ---
+        const inClient  = typeof liff.isInClient  === 'function' ? liff.isInClient()  : false;
+        const loggedIn  = typeof liff.isLoggedIn  === 'function' ? liff.isLoggedIn()  : false;
+        showDebugLog(`inClient: ${inClient}, loggedIn: ${loggedIn}`, 'info');
+
+        // LINEアプリ内ならログイン不要（ここで login() しない）
+        if (inClient) {
+            showDebugLog('Running in LINE client. Skip liff.login().', 'success');
+        } else {
+            // 外部ブラウザなら未ログイン時のみ login。戻り先を明示
+            if (!loggedIn) {
+                const redirect = location.href;
+                showDebugLog(`Not in client & not logged in → liff.login({redirectUri:${redirect}})`, 'warn');
+                liff.login({ redirectUri: redirect });
+                return false; // ここで一旦終了（遷移）
+            }
         }
-        
-        showDebugLog('LIFF初期化完了 - ログイン済み', 'success');
+
+        showDebugLog('LIFF 初期化完了', 'success');
+        liffInitialized = true;
         return true;
         
     } catch (error) {
