@@ -29,6 +29,11 @@ awf.technavigation.jp {
         root * /opt/rcline/services/api-server/public
         try_files {path} /index.html
         file_server
+        # LIFF 用CSP設定（CSP = Contents Security Policy）
+        # CSP: LIFFが使うドメインを網羅（script/connect/img/style）
+        header {
+            Content-Security-Policy "default-src 'self' https://awf.technavigation.jp; script-src 'self' https://static.line-scdn.net 'unsafe-inline'; connect-src 'self' https://awf.technavigation.jp https://api.line.me https://access.line.me https://liff.line.me; img-src 'self' data: https://static.line-scdn.net https://profile.line-scdn.net; style-src 'self' 'unsafe-inline' https://static.line-scdn.net; frame-ancestors https://liff.line.me https://awf.technavigation.jp"
+        }
     }
 
     # 従来のAPI（互換性維持）
