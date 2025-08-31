@@ -8,6 +8,7 @@ import path from 'path';
 import fs from 'fs/promises';
 import { v4 as uuidv4 } from 'uuid';
 import axios from 'axios';
+// import { sendEventMulticast } from '../line/line-client.js';
 
 const router = express.Router();
 
@@ -889,7 +890,7 @@ router.post('/events', requireAuth, upload.single('image'), [
                   // LIFFメッセージを構築
                   const liffUrl = `https://awf.technavigation.jp/rcline/?eventId=${eventId}`;
                   
-                  // 画像URLを完全なURLに変換
+                  // 画像URLを完全なURLに変換（httpsスキーム必須）
                   const fullImageUrl = event.image_url 
                     ? `https://awf.technavigation.jp/rcline${event.image_url}`
                     : null;
@@ -906,6 +907,7 @@ router.post('/events', requireAuth, upload.single('image'), [
                     timeZone: 'Asia/Tokyo'
                   });
                   
+                  // SDK経由で送信（一時的に元のコードに戻す）
                   const message = {
                     type: 'flex',
                     altText: `${event.title} - 出欠確認`,
