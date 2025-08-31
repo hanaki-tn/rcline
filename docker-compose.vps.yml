@@ -48,7 +48,7 @@ services:
       - caddy_data:/data
       - caddy_config:/config
       - ./services/api-server/public:/opt/rcline/services/api-server/public:ro # 静的ファイル用
-#      - /var/www:/var/www  # 静的ファイル用
+      - /var/www/files:/var/www/files:ro  # アップロード画像ファイル配信用
     depends_on:
       - api-server
       - linehook
