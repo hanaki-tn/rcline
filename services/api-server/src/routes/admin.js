@@ -888,14 +888,32 @@ router.post('/events', requireAuth, upload.single('image'), [
                   
                   // LIFFメッセージを構築
                   const liffUrl = `https://awf.technavigation.jp/rcline/?eventId=${eventId}`;
+                  
+                  // 画像URLを完全なURLに変換
+                  const fullImageUrl = event.image_url 
+                    ? `https://awf.technavigation.jp/rcline${event.image_url}`
+                    : null;
+                  
+                  // 日時をフォーマット
+                  const heldAtDate = new Date(event.held_at);
+                  const formattedDate = heldAtDate.toLocaleDateString('ja-JP', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    weekday: 'short',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    timeZone: 'Asia/Tokyo'
+                  });
+                  
                   const message = {
                     type: 'flex',
                     altText: `${event.title} - 出欠確認`,
                     contents: {
                       type: 'bubble',
-                      hero: event.image_url ? {
+                      hero: fullImageUrl ? {
                         type: 'image',
-                        url: event.image_url,
+                        url: fullImageUrl,
                         size: 'full',
                         aspectRatio: '20:13',
                         aspectMode: 'cover'
@@ -912,7 +930,7 @@ router.post('/events', requireAuth, upload.single('image'), [
                           },
                           {
                             type: 'text',
-                            text: event.held_at,
+                            text: formattedDate,
                             size: 'sm',
                             color: '#666666',
                             margin: 'md'
@@ -940,7 +958,7 @@ router.post('/events', requireAuth, upload.single('image'), [
                   };
                   
                   // hero画像がない場合は削除
-                  if (!event.image_url) {
+                  if (!fullImageUrl) {
                     delete message.contents.hero;
                   }
                   
