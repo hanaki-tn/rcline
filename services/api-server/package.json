@@ -17,6 +17,7 @@
   "dependencies": {
     "@line/bot-sdk": "^10.2.0",
     "axios": "^1.7.2",
+    "dotenv": "^16.4.5",
     "bcryptjs": "^2.4.3",
     "bull": "^4.12.2",
     "connect-flash": "^0.1.1",
