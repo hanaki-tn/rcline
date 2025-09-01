@@ -115,7 +115,7 @@
             
             // 基本情報表示
             // ヘッダーのタイトルを更新
-            document.getElementById('event-title-header').textContent = `📅 ${event.title}`;
+            document.getElementById('event-title-header').textContent = `${event.title}`;
             
             let html = `
                 <div class="card">
@@ -123,7 +123,7 @@
                         
                         <!-- 2. 日時 -->
                         <div class="event-date mb-2">
-                            📅 ${formatDate(event.held_at)} ${formatTime(event.held_at)}
+                            🗓️ ${formatDate(event.held_at)} ${formatTime(event.held_at)}
                         </div>
                         
                         <!-- 3. 回答期限 -->
@@ -194,7 +194,7 @@
                 html += `
                     <div class="collapsible">
                         <div class="collapsible-header">
-                            <span>👥 出欠状況一覧 (${event.attendance_status.length}名)</span>
+                            <span>👥 出欠状況 (${event.attendance_status.length}名)</span>
                             <span class="collapse-icon">▼</span>
                         </div>
                         <div class="collapsible-content">

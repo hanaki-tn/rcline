@@ -158,7 +158,7 @@ input:focus, textarea:focus, select:focus {
 /* イベントカード */
 .event-card {
     display: block;
-    text-decoration: none;
+    text-decoration: none !important;
     color: inherit;
     background: white;
     border: 1px solid #e9ecef;
@@ -173,6 +173,20 @@ input:focus, textarea:focus, select:focus {
     box-shadow: 0 3px 8px rgba(0,0,0,0.12);
     transform: translateY(-1px);
     border-color: #06C755;
+}
+
+/* リンクのデフォルトスタイルを完全にリセット */
+a.event-card {
+    text-decoration: none !important;
+    color: inherit !important;
+}
+
+a.event-card:link,
+a.event-card:visited,
+a.event-card:hover,
+a.event-card:active {
+    text-decoration: none !important;
+    color: inherit !important;
 }
 
 .event-card-title {
