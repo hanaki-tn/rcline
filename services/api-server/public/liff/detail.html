@@ -8,13 +8,13 @@
 </head>
 <body>
     <div class="container">
-        <div class="header">
-            <h1>📅 イベント詳細</h1>
-        </div>
-
         <!-- ナビゲーション -->
         <div class="nav">
-            <a href="index.html" class="nav-button">← 一覧</a>
+            <a href="index.html" class="nav-button" style="display: inline-block; width: auto; padding: 8px 12px;">← 戻る</a>
+        </div>
+
+        <div class="header">
+            <h1 id="event-title-header">📅 イベント詳細</h1>
         </div>
 
         <!-- メインコンテンツ -->
@@ -114,11 +114,12 @@
             const isTarget = event.can_respond;
             
             // 基本情報表示
+            // ヘッダーのタイトルを更新
+            document.getElementById('event-title-header').textContent = `📅 ${event.title}`;
+            
             let html = `
                 <div class="card">
                     <div class="card-body">
-                        <!-- 1. タイトル -->
-                        <h2 class="event-title">${escapeHtml(event.title)}</h2>
                         
                         <!-- 2. 日時 -->
                         <div class="event-date mb-2">
@@ -171,13 +172,13 @@
                                     id="attend-button"
                                     class="button button-primary" 
                                     style="flex: 1; ${getButtonStyle('attend', isTarget, isPastEvent, isAttend, isAbsent)}">
-                                ✅ 出席
+                                出席
                             </button>
                             <button onclick="submitResponse('absent')" 
                                     id="absent-button"
                                     class="button button-secondary" 
                                     style="flex: 1; ${getButtonStyle('absent', isTarget, isPastEvent, isAttend, isAbsent)}">
-                                ❌ 欠席
+                                欠席
                             </button>
                         </div>
                         
