@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>イベント一覧 - RC公式LINE</title>
+    <title>イベント - 浦和北東RC</title>
     <link rel="stylesheet" href="common.css">
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>📅 イベント一覧</h1>
+            <h1>イベント</h1>
         </div>
 
         <!-- ナビゲーション -->
@@ -104,19 +104,24 @@
             let html = '<div class="event-list">';
             
             eventList.forEach(event => {
-                const statusClass = getStatusClass(event.my_response?.status || 'pending');
-                const statusText = getStatusText(event.my_response?.status || 'pending');
+                const status = event.my_response?.status || 'pending';
+                const statusText = getStatusText(status);
                 
                 // 開催日時の表示
                 const eventDate = formatDate(event.held_at);
                 const eventTime = formatTime(event.held_at);
                 
+                // 回答期限の表示
+                const deadlineDate = event.deadline_at ? formatDate(event.deadline_at) : null;
+                const deadlineTime = event.deadline_at ? formatTime(event.deadline_at) : null;
+                
                 html += `
-                    <a href="detail.html?id=${event.id}" class="event-item">
-                        <div class="event-title">${escapeHtml(event.title)}</div>
-                        <div class="event-date">📅 ${eventDate} ${eventTime}</div>
-                        <div class="event-status ${statusClass}">
-                            回答状況: ${statusText}
+                    <a href="detail.html?id=${event.id}" class="event-card">
+                        <div class="event-card-title">${escapeHtml(event.title)}</div>
+                        <div class="event-card-datetime">🗓️ ${eventDate} ${eventTime}</div>
+                        <div class="event-card-footer">
+                            <span class="status-badge status-${status}">${statusText}</span>
+                            ${status === 'pending' && deadlineDate ? `<span class="event-deadline">回答期限: ${deadlineDate} ${deadlineTime}</span>` : ''}
                         </div>
                     </a>
                 `;

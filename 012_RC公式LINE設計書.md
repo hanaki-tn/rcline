@@ -150,8 +150,8 @@
 
 1. **イベント基本情報の入力**
 
-   * **タイトル**（必須）、**概要**（ほぼ固定メッセージ。変更可）、**イベント内容のJPG画像**（必須）、**開催日**（必須）、**1行テキストの有無**（必須）。
-   * **回答期限**は**今回未使用**（DBカラムは保持、null可）。
+   * **タイトル**（必須）、**概要**（ほぼ固定メッセージ。変更可）、**イベント内容のJPG画像**（必須）、**開催日**（必須）、**回答期限**（必須）、**1行テキストの有無**（必須）。
+   * **回答期限**（必須）：回答の期限日時。表示のみで機能制限はなし。
 2. **対象者の選定**
 
    * 「全員／理事会／委員会…」を１つ以上チェック → 受信者プレビューに該当会員がチェックONの状態で表示される。
@@ -166,7 +166,7 @@
 
 1. **メッセージのリンクをタップ** → LINE内ブラウザで**イベント詳細**を表示。
 
-   * 表示：タイトル／本文／**開催日（JST）**。
+   * 表示：タイトル／本文／**開催日（JST）**／**回答期限（JST）**。
 2. **出席 or 欠席 をタップ** → サーバが`event_responses`へ**追記**。
 
    * 何度でも回答可能。**最新行が現在値**になる。
@@ -369,6 +369,7 @@ docker compose exec redis redis-cli KEYS "*"
 
 * `title`（必須, 1〜100）
 * `held_at`（必須, JST 将来日時）
+* `deadline_at`（必須, JST 日時）…回答期限
 * `body`（任意, 〜2000）…**定型文をデフォルト**
   例：
 
@@ -523,10 +524,11 @@ docker compose exec redis redis-cli KEYS "*"
 
 **URL**: `/liff/detail.html?id={event_id}`
 
-**レイアウト順序**（カード形式）:
+**レイウト順序**（カード形式）:
 1. **タイトル** (`event.title`)
 2. **日時** (`event.held_at` をJST形式で表示）
-3. **画像** (プレビュー表示 + タップで全画面表示)
+3. **回答期限** (`event.deadline_at` をJST形式で表示）
+4. **画像** (プレビュー表示 + タップで全画面表示)
 4. **コメント** (`event.body`)
 5. **現在の回答状況** (既に回答済みの場合のみ表示)
 6. **出欠回答セクション** (`🗳️ 出欠回答`)
@@ -568,7 +570,7 @@ docker compose exec redis redis-cli KEYS "*"
 **エラー処理**:
 * 招待対象外：403 Access Denied
 * イベント不存在：404 Event Not Found
-* 期限超過：今回なし（`deadline_at`はnull運用）
+* 期限超過：今回なし（`deadline_at`は表示のみ、機能制限なし）
 
 ---
 
@@ -756,6 +758,7 @@ docker compose exec redis redis-cli KEYS "*"
 
   * `title` (string, required, 1..100)
   * `held_at` (string, ISO8601+09:00, required, now以降)
+  * `deadline_at` (string, ISO8601+09:00, required) …回答期限
   * `body` (string, optional, ≤2000) ※定型文デフォルト
   * `extra_text_enabled` (boolean, default=false)
   * `extra_text_label` (string, default="備考")
@@ -791,6 +794,7 @@ docker compose exec redis redis-cli KEYS "*"
   { "items": [
       { "id":123, "title":"理事会9月",
         "held_at":"2025-09-10T19:00:00+09:00",
+        "deadline_at":"2025-09-08T23:59:00+09:00",
         "image_preview_url": "https://.../p.jpg",
         "push_stats": { "success":44, "fail":1, "last_sent_at":"..." } }
   ] }
@@ -855,6 +859,7 @@ docker compose exec redis redis-cli KEYS "*"
   { "items": [
       { "id":123, "title":"理事会9月",
         "held_at":"2025-09-10T19:00:00+09:00",
+        "deadline_at":"2025-09-08T23:59:00+09:00",
         "my_status":"pending|attend|absent" }
   ] }
   ```
@@ -1346,7 +1351,7 @@ UPDATE members
   * `title`：イベントタイトル。
   * `body`：LIFF詳細上部に表示する短文（定型文ベース）。
   * `held_at`：開催日時（JST ISO8601）。**過去日時は作成不可**。
-  * `deadline_at`：回答期限。今回は**NULL運用**（将来拡張のため残置）。
+  * `deadline_at`：回答期限（JST ISO8601）。**表示のみで機能制限はなし**。
   * `image_url`：**オリジナルJPG**の公開URL（高解像度・全画面用）。
   * `image_size`：バイト数（任意）。
   * `image_preview_url`：**プレビューJPG**の公開URL（幅\~1080px）。メッセージとLIFF本文で主に使用。
@@ -1461,7 +1466,7 @@ CREATE TABLE events (
   title            TEXT NOT NULL,
   body             TEXT,
   held_at          TEXT NOT NULL,           -- JST ISO8601
-  deadline_at      TEXT,                    -- NULL（今回未使用）
+  deadline_at      TEXT NOT NULL,           -- JST ISO8601（回答期限）
   -- 添付（JPG）
   image_url        TEXT,                          -- オリジナルJPGの公開URL
   image_size       INTEGER,                       -- バイト
@@ -1649,6 +1654,6 @@ awf.technavigation.jp {
 
 * **From表記**：**無し**（当面は事務局のみ利用）
 * **個別メッセージ送信機能**：**無し**（将来需要があれば再検討）
-* **回答期限**：DBには保持できるが、今回UI非表示・判定無し（null）
+* **回答期限の機能制限**：期限は表示のみで、期限を過ぎても回答は可能（機能制限なし）
 
 

@@ -125,7 +125,14 @@
                             📅 ${formatDate(event.held_at)} ${formatTime(event.held_at)}
                         </div>
                         
-                        <!-- 3. 画像表示 -->
+                        <!-- 3. 回答期限 -->
+                        ${event.deadline_at ? `
+                            <div class="event-date mb-2" style="color: #dc3545;">
+                                ⏰ 回答期限: ${formatDate(event.deadline_at)} ${formatTime(event.deadline_at)}
+                            </div>
+                        ` : ''}
+                        
+                        <!-- 4. 画像表示 -->
                         ${event.image_preview_url ? `
                             <div class="mb-3">
                                 <img src="${escapeHtml(event.image_preview_url)}" 

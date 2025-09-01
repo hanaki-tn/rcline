@@ -155,6 +155,79 @@ input:focus, textarea:focus, select:focus {
     margin: 0;
 }
 
+/* イベントカード */
+.event-card {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+    background: white;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 12px;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.event-card:hover {
+    box-shadow: 0 3px 8px rgba(0,0,0,0.12);
+    transform: translateY(-1px);
+    border-color: #06C755;
+}
+
+.event-card-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 10px;
+    color: #212529;
+}
+
+.event-card-datetime {
+    font-size: 14px;
+    color: #6c757d;
+    margin-bottom: 12px;
+}
+
+.event-card-footer {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+/* ステータスバッジ */
+.status-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.status-badge.status-pending {
+    background-color: #e9ecef;
+    color: #6c757d;
+}
+
+.status-badge.status-attend {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.status-badge.status-absent {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+/* 締切日時（今後の実装用） */
+.event-deadline {
+    font-size: 13px;
+    color: #dc3545;
+    margin-left: auto;
+}
+
+/* 旧スタイル（互換性のため残す） */
 .event-item {
     display: block;
     text-decoration: none;
