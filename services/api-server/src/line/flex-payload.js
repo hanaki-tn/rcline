@@ -1,5 +1,5 @@
 // Flex Messageのペイロード構築
-export const buildEventFlexMessage = ({ title, description, imageUrl, liffUrl, heldAt }) => {
+export const buildEventFlexMessage = ({ title, description, imageUrl, originalImageUrl, liffUrl, heldAt }) => {
   const message = {
     type: 'flex',
     altText: `${title} - 出欠確認`,
@@ -48,10 +48,14 @@ export const buildEventFlexMessage = ({ title, description, imageUrl, liffUrl, h
   if (imageUrl) {
     message.contents.hero = {
       type: 'image',
-      url: imageUrl,  // 必ずhttps://で始まるURL
+      url: imageUrl,  // プレビュー画像（必ずhttps://で始まるURL）
       size: 'full',
       aspectRatio: '20:13',
-      aspectMode: 'cover'
+      aspectMode: 'cover',
+      action: {
+        type: 'uri',
+        uri: originalImageUrl || imageUrl  // オリジナル画像、なければプレビュー画像
+      }
     };
   }
 

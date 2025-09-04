@@ -860,7 +860,7 @@ router.post('/events', requireAuth, upload.single('image'), [
               console.log(`[LIVE] LINE送信開始: イベントID=${eventId}, 対象=${memberIds.length}名`);
               
               // イベント情報とメンバー情報を取得
-              const eventSql = 'SELECT title, held_at, image_url FROM events WHERE id = ?';
+              const eventSql = 'SELECT title, held_at, image_url, image_preview_url FROM events WHERE id = ?';
               req.db.get(eventSql, [eventId], (err, event) => {
                 if (err) {
                   req.db.run('ROLLBACK');
@@ -890,9 +890,9 @@ router.post('/events', requireAuth, upload.single('image'), [
                   // LIFFメッセージを構築
                   const liffUrl = `https://liff.line.me/2007866921-LkR3yg4k?id=${eventId}`;
                   
-                  // 画像URLを完全なURLに変換（httpsスキーム必須）
-                  const fullImageUrl = event.image_url 
-                    ? `https://awf.technavigation.jp${event.image_url}`
+                  // プレビュー画像URLを構築（httpsスキーム必須）
+                  const fullPreviewImageUrl = event.image_preview_url 
+                    ? `https://awf.technavigation.jp${event.image_preview_url}`
                     : null;
                   
                   // 日時をフォーマット
@@ -907,18 +907,27 @@ router.post('/events', requireAuth, upload.single('image'), [
                     timeZone: 'Asia/Tokyo'
                   });
                   
+                  // オリジナル画像URLも構築
+                  const fullOriginalImageUrl = event.image_url 
+                    ? `https://awf.technavigation.jp${event.image_url}`
+                    : null;
+                  
                   // SDK経由で送信（一時的に元のコードに戻す）
                   const message = {
                     type: 'flex',
                     altText: `${event.title} - 出欠確認`,
                     contents: {
                       type: 'bubble',
-                      hero: fullImageUrl ? {
+                      hero: fullPreviewImageUrl ? {
                         type: 'image',
-                        url: fullImageUrl,
+                        url: fullPreviewImageUrl,  // プレビュー画像
                         size: 'full',
                         aspectRatio: '20:13',
-                        aspectMode: 'cover'
+                        aspectMode: 'cover',
+                        action: {
+                          type: 'uri',
+                          uri: fullOriginalImageUrl || fullPreviewImageUrl  // オリジナル画像、なければプレビュー画像
+                        }
                       } : null,
                       body: {
                         type: 'box',
@@ -960,7 +969,7 @@ router.post('/events', requireAuth, upload.single('image'), [
                   };
                   
                   // hero画像がない場合は削除
-                  if (!fullImageUrl) {
+                  if (!fullPreviewImageUrl) {
                     delete message.contents.hero;
                   }
                   
