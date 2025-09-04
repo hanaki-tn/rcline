@@ -888,11 +888,11 @@ router.post('/events', requireAuth, upload.single('image'), [
                   }
                   
                   // LIFFメッセージを構築
-                  const liffUrl = `https://awf.technavigation.jp/rcline/?eventId=${eventId}`;
+                  const liffUrl = `https://liff.line.me/2007866921-LkR3yg4k?id=${eventId}`;
                   
                   // 画像URLを完全なURLに変換（httpsスキーム必須）
                   const fullImageUrl = event.image_url 
-                    ? `https://awf.technavigation.jp/rcline${event.image_url}`
+                    ? `https://awf.technavigation.jp${event.image_url}`
                     : null;
                   
                   // 日時をフォーマット

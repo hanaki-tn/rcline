@@ -38,6 +38,13 @@
         // ページ初期化
         async function initPage() {
             try {
+                // URLパラメータチェック：特定イベントIDが指定されていればdetail.htmlへリダイレクト
+                const eventId = getUrlParameter('id');
+                if (eventId) {
+                    window.location.href = `detail.html?id=${eventId}`;
+                    return;
+                }
+
                 // ユーザー情報取得
                 currentUser = await getCurrentUser();
                 if (!currentUser) {
