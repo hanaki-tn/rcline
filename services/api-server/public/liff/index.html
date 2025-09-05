@@ -38,14 +38,7 @@
         // ページ初期化
         async function initPage() {
             try {
-                // URLパラメータチェック：特定イベントIDが指定されていればdetail.htmlへリダイレクト
-                const eventId = getUrlParameter('id');
-                if (eventId) {
-                    window.location.href = `detail.html?id=${eventId}`;
-                    return;
-                }
-
-                // ユーザー情報取得
+                // ユーザー情報取得（最優先）
                 currentUser = await getCurrentUser();
                 if (!currentUser) {
                     showError('main-content', '認証に失敗しました。LINEから再度アクセスしてください。');
@@ -59,7 +52,21 @@
                 // 未紐付け（is_target=0）の場合は会員登録画面へ遷移
                 if (!userData.is_target || userData.is_target === 0) {
                     console.log('未紐付けユーザーのため、会員登録画面へ遷移します');
-                    window.location.href = 'register.html?from=events';
+                    
+                    // URLパラメータを保持して会員登録画面へ遷移
+                    const eventId = getUrlParameter('id');
+                    if (eventId) {
+                        window.location.href = `register.html?from=detail&id=${eventId}`;
+                    } else {
+                        window.location.href = 'register.html?from=events';
+                    }
+                    return;
+                }
+
+                // 紐付け済みユーザーの場合、URLパラメータチェック
+                const eventId = getUrlParameter('id');
+                if (eventId) {
+                    window.location.href = `detail.html?id=${eventId}`;
                     return;
                 }
 

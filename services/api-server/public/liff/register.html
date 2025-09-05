@@ -175,6 +175,8 @@
         // URLパラメータ取得
         const urlParams = new URLSearchParams(window.location.search);
         const fromEvents = urlParams.get('from') === 'events';
+        const fromDetail = urlParams.get('from') === 'detail';
+        const eventId = urlParams.get('id');
 
         // フォーム要素
         const form = document.getElementById('register-form');
@@ -190,8 +192,7 @@
         // ページ初期化
         async function initPage() {
             try {
-                // LIFF初期化
-                await initializeLiff();
+                // LIFF初期化は common.js の getCurrentUser() で処理
 
                 // 開発環境でのユーザー情報表示
                 if (CONFIG.isDev) {
@@ -209,6 +210,7 @@
                         <div class="message message-info">
                             <strong>開発モード:</strong> 会員登録画面
                             ${fromEvents ? '<br>（イベント一覧から遷移）' : ''}
+                            ${fromDetail && eventId ? `<br>（イベント詳細 ID:${eventId} から遷移）` : ''}
                         </div>
                     `;
                     
@@ -227,7 +229,7 @@
                         showSuccess('既に会員登録が完了しています。');
                         setTimeout(() => {
                             navigateAfterRegistration();
-                        }, 2000);
+                        }, 1000);
                         return;
                     }
                 } catch (error) {
@@ -274,10 +276,10 @@
                         clearAuthCache();
                     }
                     
-                    // 2秒後に遷移
+                    // 1秒後に遷移
                     setTimeout(() => {
                         navigateAfterRegistration();
-                    }, 2000);
+                    }, 1000);
                 } else {
                     const error = await response.json();
                     if (error.code === 'NO_MATCH') {
@@ -309,7 +311,10 @@
 
         // 登録後の遷移
         function navigateAfterRegistration() {
-            if (fromEvents) {
+            if (fromDetail && eventId) {
+                // 特定イベント詳細から来た場合は該当イベント詳細へ
+                window.location.href = `detail.html?id=${eventId}`;
+            } else if (fromEvents) {
                 // イベント一覧から来た場合は一覧へ戻る
                 window.location.href = 'index.html';
             } else {
