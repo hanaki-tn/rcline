@@ -60,7 +60,7 @@ async function initDatabase() {
       'CREATE INDEX IF NOT EXISTS idx_event_responses_latest ON event_responses(event_id, member_id, responded_at DESC)',
       
       // members の表示順序最適化
-      'CREATE INDEX IF NOT EXISTS idx_members_display ON members(display_order ASC NULLS LAST, name)',
+      'CREATE INDEX IF NOT EXISTS idx_members_display ON members(display_order, name)',
       
       // 追加：LINE user ID による高速検索
       'CREATE INDEX IF NOT EXISTS idx_members_line_user_id ON members(line_user_id)',

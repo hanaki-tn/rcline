@@ -220,7 +220,7 @@ router.get('/members', requireAuth, (req, res) => {
     sql += ' AND line_user_id IS NOT NULL';
   }
   
-  sql += ' ORDER BY display_order ASC NULLS LAST, name ASC';
+  sql += ' ORDER BY display_order, name ASC';
   
   req.db.all(sql, params, (err, rows) => {
     if (err) {
@@ -238,7 +238,7 @@ router.get('/members', requireAuth, (req, res) => {
 // audiences一覧 - フェーズ1-3
 router.get('/audiences', requireAuth, (req, res) => {
   req.db.all(
-    'SELECT id, name, sort_order, created_at, updated_at FROM audiences ORDER BY sort_order ASC NULLS LAST, name ASC',
+    'SELECT id, name, sort_order, created_at, updated_at FROM audiences ORDER BY sort_order, name ASC',
     (err, rows) => {
       if (err) {
         console.error('audiences一覧取得エラー:', err);
@@ -385,7 +385,7 @@ router.get('/audiences/:id/members', requireAuth, (req, res) => {
     FROM audience_members am
     JOIN members m ON am.member_id = m.id
     WHERE am.audience_id = ?
-    ORDER BY m.display_order ASC NULLS LAST, m.name ASC
+    ORDER BY m.display_order, m.name ASC
   `;
 
   req.db.all(sql, [id], (err, rows) => {
@@ -567,7 +567,7 @@ router.get('/events/:id', requireAuth, (req, res) => {
           WHERE er.event_id = ?
         ) latest_response ON et.member_id = latest_response.member_id AND latest_response.rn = 1
         WHERE et.event_id = ?
-        ORDER BY m.display_order ASC NULLS LAST, m.name ASC
+        ORDER BY m.display_order, m.name ASC
       `;
       
       req.db.all(statusSql, [id, id], (err, currentStatus) => {
@@ -630,7 +630,7 @@ router.get('/events/:id/export/latest.csv', requireAuth, (req, res) => {
         WHERE er.event_id = ?
       ) latest_response ON et.member_id = latest_response.member_id AND latest_response.rn = 1
       WHERE et.event_id = ?
-      ORDER BY m.display_order ASC NULLS LAST, m.name ASC
+      ORDER BY m.display_order, m.name ASC
     `;
     
     req.db.all(csvSql, [id, id], (err, rows) => {

@@ -5,7 +5,7 @@ const DB_PATH = process.env.DATABASE_PATH || '/app/data/rcline.db';
 const db = new sqlite3.Database(DB_PATH);
 
 console.log('\n=== Members テーブル ===');
-db.all('SELECT * FROM members ORDER BY display_order ASC NULLS LAST, name ASC', (err, rows) => {
+db.all('SELECT * FROM members ORDER BY display_order, name ASC', (err, rows) => {
   if (err) {
     console.error('Error:', err);
     process.exit(1);

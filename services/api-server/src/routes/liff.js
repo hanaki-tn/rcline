@@ -332,7 +332,7 @@ router.get('/events/:id', requireLineUser, async (req, res) => {
         WHERE er.event_id = ?
       ) latest_response ON et.member_id = latest_response.member_id AND latest_response.rn = 1
       WHERE et.event_id = ?
-      ORDER BY m.display_order ASC NULLS LAST, m.name ASC
+      ORDER BY m.display_order, m.name ASC
     `;
 
     const attendanceStatus = await new Promise((resolve, reject) => {
