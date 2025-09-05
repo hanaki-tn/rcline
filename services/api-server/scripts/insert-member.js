@@ -1,6 +1,9 @@
 import sqlite3 from 'sqlite3';
 import { nowJST } from '../src/database.js';
 
+// この行をコメントアウトして実行してください
+process.exit(1);
+
 const DB_PATH = process.env.DATABASE_PATH || '/app/data/rcline.db';
 
 const db = new sqlite3.Database(DB_PATH);
