@@ -7,6 +7,14 @@ const CONFIG = {
     isDev: window.location.hostname === 'localhost'
 };
 
+// セッションキャッシュ設定
+const SESSION_STORAGE = {
+    USER_INFO: 'liff_user_info',
+    LIFF_PROFILE: 'liff_profile',
+    USER_EXPIRES: 'liff_user_expires',
+    PROFILE_EXPIRES: 'liff_profile_expires'
+};
+
 // API リクエストヘルパー
 async function apiRequest(endpoint, options = {}) {
     const headers = {
@@ -35,15 +43,102 @@ async function apiRequest(endpoint, options = {}) {
         return response;
     } catch (error) {
         console.error(`API Error [${endpoint}]:`, error);
+        
+        // 認証エラー時はキャッシュクリア
+        if (error.message.includes('401') || error.message.includes('UNAUTHENTICATED')) {
+            clearAuthCache();
+        }
+        
         throw error;
     }
 }
 
-// 現在のユーザー情報を取得
+// キャッシュクリア関数
+function clearAuthCache() {
+    sessionStorage.removeItem(SESSION_STORAGE.USER_INFO);
+    sessionStorage.removeItem(SESSION_STORAGE.LIFF_PROFILE);
+    sessionStorage.removeItem(SESSION_STORAGE.USER_EXPIRES);
+    sessionStorage.removeItem(SESSION_STORAGE.PROFILE_EXPIRES);
+    console.log('[CACHE] 認証キャッシュをクリアしました');
+}
+
+// セッションキャッシュから取得（期限チェック付き）
+function getFromSessionCache(key, expiresKey) {
+    try {
+        const cached = sessionStorage.getItem(key);
+        const expires = sessionStorage.getItem(expiresKey);
+        
+        if (cached && expires && Date.now() < parseInt(expires)) {
+            console.log(`[CACHE] ${key} をキャッシュから取得`);
+            return JSON.parse(cached);
+        }
+        
+        // 期限切れの場合はクリア
+        if (cached) {
+            sessionStorage.removeItem(key);
+            sessionStorage.removeItem(expiresKey);
+            console.log(`[CACHE] ${key} の期限切れキャッシュをクリア`);
+        }
+        
+        return null;
+    } catch (error) {
+        console.error(`[CACHE] ${key} 読み込みエラー:`, error);
+        return null;
+    }
+}
+
+// セッションキャッシュに保存（1時間有効）
+function saveToSessionCache(key, expiresKey, data) {
+    try {
+        const expires = Date.now() + (60 * 60 * 1000); // 1時間
+        sessionStorage.setItem(key, JSON.stringify(data));
+        sessionStorage.setItem(expiresKey, expires.toString());
+        console.log(`[CACHE] ${key} をキャッシュに保存（期限: ${new Date(expires).toLocaleString()}）`);
+    } catch (error) {
+        console.error(`[CACHE] ${key} 保存エラー:`, error);
+    }
+}
+
+// LIFF プロフィール取得（キャッシュ付き）
+async function getCachedLiffProfile() {
+    // キャッシュ確認
+    let profile = getFromSessionCache(SESSION_STORAGE.LIFF_PROFILE, SESSION_STORAGE.PROFILE_EXPIRES);
+    if (profile) {
+        return profile;
+    }
+    
+    // キャッシュなし：LIFF SDKから取得
+    try {
+        if (typeof liff !== 'undefined' && liff.isLoggedIn && liff.isLoggedIn()) {
+            profile = await liff.getProfile();
+            saveToSessionCache(SESSION_STORAGE.LIFF_PROFILE, SESSION_STORAGE.PROFILE_EXPIRES, profile);
+            return profile;
+        }
+        return null;
+    } catch (error) {
+        console.error('LIFF プロフィール取得エラー:', error);
+        return null;
+    }
+}
+
+// 現在のユーザー情報を取得（キャッシュ付き）
 async function getCurrentUser() {
+    // キャッシュ確認
+    let userInfo = getFromSessionCache(SESSION_STORAGE.USER_INFO, SESSION_STORAGE.USER_EXPIRES);
+    if (userInfo) {
+        return userInfo;
+    }
+    
+    // キャッシュなし：APIから取得
     try {
         const response = await apiRequest('/api/liff/me');
-        return await response.json();
+        userInfo = await response.json();
+        
+        if (userInfo) {
+            saveToSessionCache(SESSION_STORAGE.USER_INFO, SESSION_STORAGE.USER_EXPIRES, userInfo);
+        }
+        
+        return userInfo;
     } catch (error) {
         console.error('ユーザー情報取得エラー:', error);
         return null;
@@ -232,6 +327,18 @@ if (CONFIG.isDev) {
         getConfig() {
             console.log('Config:', CONFIG);
             return CONFIG;
+        },
+        
+        // キャッシュ関連デバッグ
+        clearCache() {
+            clearAuthCache();
+            console.log('🗑️ キャッシュをクリアしました');
+        },
+        
+        showCache() {
+            console.log('💾 現在のキャッシュ状況:');
+            console.log('USER_INFO:', getFromSessionCache(SESSION_STORAGE.USER_INFO, SESSION_STORAGE.USER_EXPIRES));
+            console.log('LIFF_PROFILE:', getFromSessionCache(SESSION_STORAGE.LIFF_PROFILE, SESSION_STORAGE.PROFILE_EXPIRES));
         }
     };
     

@@ -15,7 +15,7 @@ caddy/Caddyfile.backup*
 docker-compose.yml.backup*
 
 # データベースファイル（本番データ保護）
-#rcline.db
+rcline.db
 *.db-journal
 
 # バックアップファイル（本番データ保護）
@@ -28,3 +28,6 @@ logs/
 
 # 参考資料（メインプロジェクトには含めない）
 reference/
+
+# 作業メモ（一時的なファイル）
+docs/800_作業メモ/

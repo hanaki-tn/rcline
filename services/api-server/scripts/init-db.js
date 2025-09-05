@@ -50,6 +50,38 @@ async function initDatabase() {
       });
     });
 
+    // 高速化インデックス追加
+    console.log('Creating performance indexes...');
+    const performanceIndexes = [
+      // event_targets の複合検索最適化
+      'CREATE INDEX IF NOT EXISTS idx_event_targets_lookup ON event_targets(event_id, member_id)',
+      
+      // event_responses の最新回答取得最適化
+      'CREATE INDEX IF NOT EXISTS idx_event_responses_latest ON event_responses(event_id, member_id, responded_at DESC)',
+      
+      // members の表示順序最適化
+      'CREATE INDEX IF NOT EXISTS idx_members_display ON members(display_order ASC NULLS LAST, name)',
+      
+      // 追加：LINE user ID による高速検索
+      'CREATE INDEX IF NOT EXISTS idx_members_line_user_id ON members(line_user_id)',
+      
+      // 追加：管理者による作成イベント検索
+      'CREATE INDEX IF NOT EXISTS idx_events_admin ON events(created_by_admin)'
+    ];
+
+    for (const indexSql of performanceIndexes) {
+      await new Promise((resolve, reject) => {
+        db.run(indexSql, (err) => {
+          if (err) {
+            console.warn('Index creation warning:', err.message);
+            resolve(); // 警告として扱い、処理継続
+          } else {
+            resolve();
+          }
+        });
+      });
+    }
+
     // 初期管理ユーザー作成
     const adminUsername = process.env.ADMIN_USERNAME || 'admin';
     const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
