@@ -11,13 +11,22 @@ RC公式LINEシステム - LINEボットを使った会員向け出欠確認シ�
 ## 環境構成
 
 ### ローカル環境（開発環境）
-- Docker Compose使用
-- 設定ファイル: `docker-compose.yml`
+- **OS**: Linux on WSL2
+- **Docker**: v28.3.2
+- **Docker Compose**: v2.39.1（新形式）
+- 設定ファイル: `docker compose.yml`
 
 ### VPS環境（本番環境）
 - カレントディレクトリ: `/opt/rcline`
-- 設定ファイル: `docker-compose.vps.yml`
+- **Docker Compose**: v2.x（新形式）
+- 設定ファイル: `docker compose.vps.yml`
 - デプロイ: Gitを経由してのみファイル転送可能
+- **重要**: sparse-checkout設定済み（VPS固有ファイルはpullしない）
+
+### Docker Composeコマンド形式
+- **使用形式**: `docker compose`（スペース区切り）- Docker Compose v2
+- **旧形式**: `docker compose`（ハイフン区切り）- 非推奨
+- **理由**: 2021年以降、Docker CLIに統合されたサブコマンド形式が標準
 
 ## 重要な作業フロー
 
@@ -35,8 +44,8 @@ git push
 # VPSサーバーで実行
 cd /opt/rcline
 git pull
-docker-compose -f docker-compose.vps.yml down
-docker-compose -f docker-compose.vps.yml up -d
+docker compose -f docker compose.vps.yml down
+docker compose -f docker compose.vps.yml up -d
 ```
 
 ## 主要な設計書
@@ -64,7 +73,7 @@ docker-compose -f docker-compose.vps.yml up -d
 ### Docker Compose
 | ローカル環境 | VPS環境 | VPS適用コマンド |
 |-------------|---------|----------------|
-| `docker-compose.yml` | `docker-compose.vps.yml` | `cp -p docker-compose.vps.yml docker-compose.yml` |
+| `docker compose.yml` | `docker compose.vps.yml` | `cp -p docker compose.vps.yml docker compose.yml` |
 
 ### Caddy設定
 | ローカル環境 | VPS環境 | VPS適用コマンド |
@@ -101,32 +110,32 @@ docker-compose -f docker-compose.vps.yml up -d
 ### Docker操作
 ```bash
 # ローカル環境
-docker-compose up -d
-docker-compose down
-docker-compose logs -f api-server
+docker compose up -d
+docker compose down
+docker compose logs -f api-server
 
 # VPS環境
-docker-compose -f docker-compose.vps.yml up -d
-docker-compose -f docker-compose.vps.yml down
-docker-compose -f docker-compose.vps.yml logs -f api-server
+docker compose -f docker compose.vps.yml up -d
+docker compose -f docker compose.vps.yml down
+docker compose -f docker compose.vps.yml logs -f api-server
 ```
 
 ### ログ確認
 ```bash
 # リアルタイム監視
-docker-compose -f docker-compose.vps.yml logs -f api-server
+docker compose -f docker compose.vps.yml logs -f api-server
 
 # エラーログ抽出
-docker-compose -f docker-compose.vps.yml logs api-server | grep ERROR
+docker compose -f docker compose.vps.yml logs api-server | grep ERROR
 
 # LINE関連ログ
-docker-compose -f docker-compose.vps.yml logs api-server | grep "LINE"
+docker compose -f docker compose.vps.yml logs api-server | grep "LINE"
 ```
 
 ### データベース確認
 ```bash
 # コンテナ内でSQLite操作
-docker-compose exec api-server sqlite3 /app/data/rcline.db
+docker compose exec api-server sqlite3 /app/data/rcline.db
 
 # よく使うクエリ
 SELECT * FROM members LIMIT 10;
@@ -192,10 +201,10 @@ docs/
 ### 緊急時の対処
 ```bash
 # サービス再起動
-docker-compose -f docker-compose.vps.yml restart api-server
+docker compose -f docker compose.vps.yml restart api-server
 
 # ログ大量出力時の確認
-docker-compose -f docker-compose.vps.yml logs --tail=100 api-server
+docker compose -f docker compose.vps.yml logs --tail=100 api-server
 ```
 
 ## テスト・デバッグ
@@ -203,10 +212,10 @@ docker-compose -f docker-compose.vps.yml logs --tail=100 api-server
 ### テストスクリプト
 ```bash
 # LINE SDK送信テスト
-docker-compose exec api-server node src/test-line-sdk.js
+docker compose exec api-server node src/test-line-sdk.js
 
 # 画像送信テスト
-docker-compose exec api-server node src/test-line-image.js
+docker compose exec api-server node src/test-line-image.js
 ```
 
 ### デバッグモード
