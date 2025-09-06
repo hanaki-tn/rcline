@@ -257,7 +257,7 @@ router.get('/events/:id', requireLineUser, async (req, res) => {
     const eventSql = `
       SELECT e.id, e.title, e.held_at, e.body, 
              e.image_url, e.image_preview_url,
-             e.extra_text_enabled, e.extra_text_label, e.extra_text_attend_only,
+             e.extra_text_enabled, e.extra_text_label,
              e.created_by_admin
       FROM events e
       WHERE e.id = ?
@@ -368,7 +368,6 @@ router.get('/events/:id', requireLineUser, async (req, res) => {
       image_preview_url: event.image_preview_url,
       extra_text_enabled: !!event.extra_text_enabled,
       extra_text_label: event.extra_text_label,
-      extra_text_attend_only: !!event.extra_text_attend_only,
       can_respond: true, // 対象者は回答可能
       my_response: myResponse ? {
         status: myResponse.status,

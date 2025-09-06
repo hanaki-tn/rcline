@@ -472,7 +472,7 @@ router.get('/events', requireAuth, (req, res) => {
   
   let sql = `
     SELECT e.id, e.title, e.held_at, e.body, e.created_at,
-           e.extra_text_enabled, e.extra_text_label, e.extra_text_attend_only,
+           e.extra_text_enabled, e.extra_text_label,
            e.image_url, e.image_preview_url,
            COUNT(et.member_id) as target_count
     FROM events e
@@ -585,8 +585,7 @@ router.get('/events/:id', requireAuth, (req, res) => {
           image_preview_url: event.image_preview_url,
           extra_text: {
             enabled: Boolean(event.extra_text_enabled),
-            label: event.extra_text_label,
-            attend_only: Boolean(event.extra_text_attend_only)
+            label: event.extra_text_label
           },
           targets_total: event.target_count,
           push_stats: stats || { success_count: 0, fail_count: 0, total_count: 0, last_sent_at: null },
@@ -705,7 +704,6 @@ router.post('/events', requireAuth, upload.single('image'), [
   body('body').optional().isLength({ max: 2000 }).withMessage('本文は2000文字以内で入力してください'),
   body('extra_text_enabled').optional().custom(value => value === 'true' || value === 'false' || typeof value === 'boolean').withMessage('追加メモ欄の設定は真偽値で入力してください'),
   body('extra_text_label').optional().isLength({ max: 50 }).withMessage('追加メモ欄のラベルは50文字以内で入力してください'),
-  body('extra_text_attend_only').optional().custom(value => value === 'true' || value === 'false' || typeof value === 'boolean').withMessage('出席時のみ表示の設定は真偽値で入力してください'),
   body('target_member_ids').isJSON().withMessage('対象メンバーIDsはJSON配列で入力してください')
 ], async (req, res) => {
   const errors = validationResult(req);
@@ -727,7 +725,7 @@ router.post('/events', requireAuth, upload.single('image'), [
   }
 
   try {
-    const { title, held_at, deadline_at, body, extra_text_enabled, extra_text_label, extra_text_attend_only, target_member_ids } = req.body;
+    const { title, held_at, deadline_at, body, extra_text_enabled, extra_text_label, target_member_ids } = req.body;
     
     // target_member_idsをパース
     let memberIds;
@@ -803,9 +801,9 @@ router.post('/events', requireAuth, upload.single('image'), [
         const eventSql = `
           INSERT INTO events (
             title, held_at, deadline_at, body, image_url, image_preview_url,
-            extra_text_enabled, extra_text_label, extra_text_attend_only,
+            extra_text_enabled, extra_text_label,
             created_by_admin, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         
         req.db.run(eventSql, [
@@ -817,7 +815,6 @@ router.post('/events', requireAuth, upload.single('image'), [
           previewImageUrl,
           extra_text_enabled === 'true' || extra_text_enabled === true ? 1 : 0,
           extra_text_label || '備考',
-          extra_text_attend_only === 'true' || extra_text_attend_only === true || extra_text_attend_only == null ? 1 : 0,
           req.session.adminUser.id, // admin user ID
           nowJST(),
           nowJST()
@@ -1108,7 +1105,7 @@ router.post('/events/:id/proxy-response', requireAuth, [
     // イベント存在確認と権限確認
     const event = await new Promise((resolve, reject) => {
       req.db.get(
-        'SELECT id, created_by_admin, extra_text_enabled, extra_text_attend_only FROM events WHERE id = ?',
+        'SELECT id, created_by_admin, extra_text_enabled FROM events WHERE id = ?',
         [eventId],
         (err, row) => {
           if (err) reject(err);
@@ -1154,12 +1151,7 @@ router.post('/events/:id/proxy-response', requireAuth, [
     // extra_textの処理
     let finalExtraText = null;
     if (event.extra_text_enabled) {
-      if (event.extra_text_attend_only && status === 'absent') {
-        // 出席時のみ表示かつ欠席の場合は無視
-        finalExtraText = null;
-      } else {
-        finalExtraText = extra_text || null;
-      }
+      finalExtraText = extra_text || null;
     }
 
     // 代理回答を記録

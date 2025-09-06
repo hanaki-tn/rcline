@@ -63,7 +63,6 @@ CREATE TABLE events (
   -- 追加メモ欄
   extra_text_enabled      INTEGER NOT NULL DEFAULT 0,  -- 0/1
   extra_text_label        TEXT DEFAULT '備考',
-  extra_text_attend_only  INTEGER NOT NULL DEFAULT 1,  -- 0/1
   created_by_admin INTEGER NOT NULL,
   created_at       TEXT NOT NULL,
   updated_at       TEXT NOT NULL,

@@ -10,7 +10,7 @@
     <div class="container">
         <!-- ナビゲーション -->
         <div class="nav" style="display: flex; justify-content: space-between; gap: 10px;">
-            <a href="index.html" class="nav-button" style="width: 33%; text-align: center;">← イベント一覧</a>
+            <a href="index.html" class="nav-button" style="width: 33%; text-align: center;">← イベント</a>
             <div style="width: 33%;"></div>
             <button onclick="closeLiff()" class="nav-button" style="width: 33%; text-align: center;">× 閉じる</button>
         </div>
@@ -162,9 +162,12 @@
                         
                         <!-- 7. 追加テキスト入力（ボタンの上に配置） -->
                         ${event.extra_text_enabled ? `
-                            <div class="mt-3" id="extra-text-section" ${event.extra_text_attend_only && !isAttend ? 'style="display: none;"' : ''}>
-                                <label for="extra-text">${escapeHtml(event.extra_text_label || '追加メモ')}</label>
-                                <textarea id="extra-text" rows="3" placeholder="メモがあればご記入ください">${escapeHtml(currentResponse.extra_text || '')}</textarea>
+                            <div class="mt-3" id="extra-text-section">
+                                <label for="extra-text">
+                                    ${escapeHtml(event.extra_text_label || '追加メモ')}
+                                    <small style="color: #dc3545;">※出席の場合は入力必須</small>
+                                </label>
+                                <textarea id="extra-text" rows="3" placeholder="出席の場合は必ずご記入ください">${escapeHtml(currentResponse.extra_text || '')}</textarea>
                             </div>
                         ` : ''}
                         
@@ -313,10 +316,20 @@
                 return; // 無効化されたボタンなので処理しない
             }
 
+            // 追加コメントの取得とバリデーション
+            let extraText = '';
+            if (eventData?.extra_text_enabled) {
+                extraText = document.getElementById('extra-text')?.value || '';
+                
+                // 出席時は必須チェック
+                if (status === 'attend' && !extraText.trim()) {
+                    showError('response-message', `${eventData.extra_text_label || '追加メモ'}を入力してください。`);
+                    document.getElementById('extra-text').focus();
+                    return;
+                }
+            }
+
             try {
-                const extraText = eventData?.extra_text_enabled 
-                    ? document.getElementById('extra-text')?.value || ''
-                    : '';
 
                 const response = await apiRequest(`/api/liff/events/${eventId}/response`, {
                     method: 'POST',

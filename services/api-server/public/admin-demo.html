@@ -195,12 +195,7 @@
                                 <div class="form-group">
                                     <label for="extra-text-label">メモ欄のラベル:</label>
                                     <input type="text" id="extra-text-label" name="extra_text_label" value="備考" maxlength="50">
-                                </div>
-                                <div class="form-group">
-                                    <label>
-                                        <input type="checkbox" id="extra-text-attend-only" name="extra_text_attend_only" checked>
-                                        出席時のみ表示
-                                    </label>
+                                    <small style="color: #6c757d;">※出席時は入力必須、欠席時は任意</small>
                                 </div>
                             </div>
                         </div>
@@ -814,9 +809,7 @@
             
             // チェックボックスの値を明示的にboolean文字列で追加
             const extraTextEnabled = document.getElementById('extra-text-enabled').checked;
-            const extraTextAttendOnly = document.getElementById('extra-text-attend-only').checked;
             formData.append('extra_text_enabled', extraTextEnabled ? 'true' : 'false');
-            formData.append('extra_text_attend_only', extraTextAttendOnly ? 'true' : 'false');
             
             messageDiv.innerHTML = '<div>作成中...</div>';
             
@@ -884,7 +877,7 @@
                     <p><strong>回答期限:</strong> ${deadlineAt}</p>
                     <p><strong>本文:</strong></p>
                     <div style="white-space: pre-wrap; background: #f8f9fa; padding: 10px; border-radius: 4px;">${event.body || '-'}</div>
-                    <p><strong>追加メモ欄:</strong> ${event.extra_text.enabled ? `有効（${event.extra_text.label}${event.extra_text.attend_only ? ', 出席時のみ表示' : ''}）` : '無効'}</p>
+                    <p><strong>追加メモ欄:</strong> ${event.extra_text.enabled ? `有効（${event.extra_text.label}）` : '無効'}</p>
                 `;
                 
                 // 送信要約表示

@@ -380,7 +380,8 @@ docker compose exec redis redis-cli KEYS "*"
 * **追加メモ欄の使用**（ON/OFF）
 
   * ON時：`extra_text_label`（例：備考）
-  * `extra_text_attend_only`（ONで「出席時のみ表示」）
+  * 出席時：入力必須
+  * 欠席時：入力任意
 
 2. 添付
 
@@ -505,11 +506,14 @@ docker compose exec redis redis-cli KEYS "*"
   * 対象イベント：`events` と `event_targets` の結合で抽出
   * 作成イベント：`events` と `admin_users` の結合で抽出  
 * 並び：**開催日順**（`held_at` 昇順）
-* 各行：タイトル／開催日／自分の出欠回答（未回答／出席／欠席）
+* 各行：
+  - 1行目：タイトル
+  - 2行目：開催日
+  - 3行目：自分の出欠回答（未回答／出席／欠席）※未回答のみ、"回答期限 " + events.deadline_at を表示。
 * タップ：L-DETAILへ遷移（`detail.html?id={event_id}`）
 
 **UI仕様**:
-* ヘッダー：「📅 イベント一覧」
+* ヘッダー：「イベント」
 * **ナビゲーション**：なし（ボタン不要）
 * プルリフレッシュ対応（モバイルでの更新操作）
 * 開発モード時：ユーザー情報と表示条件の説明を表示
@@ -541,7 +545,7 @@ docker compose exec redis redis-cli KEYS "*"
 * **回答**：
   * **［出席］／［欠席］**（何度でも可＝**最新が現在値**）
   * `extra_text_enabled=ON`のイベントのみ追加テキスト表示
-  * `extra_text_attend_only=ON` のとき、**出席**選択で表示／欠席時は非表示
+  * **出席**時は必須入力、**欠席**時は任意入力
 * **ボタン状態管理**（優先度順）：
   1. 対象者でない場合：全ボタン無効
   2. 開催日時が過ぎた場合：全ボタン無効  
@@ -762,7 +766,6 @@ docker compose exec redis redis-cli KEYS "*"
   * `body` (string, optional, ≤2000) ※定型文デフォルト
   * `extra_text_enabled` (boolean, default=false)
   * `extra_text_label` (string, default="備考")
-  * `extra_text_attend_only` (boolean, default=true)
   * `target_member_ids` (json array<number>, required) …受信者プレビューで確定
   * `image` (file, required, image/jpeg, ≤5MB)
 * **Response**:
@@ -1358,7 +1361,6 @@ UPDATE members
   * `image_preview_size`：バイト数（任意）。
   * `extra_text_enabled`：追加メモ欄の有無（0/1）。
   * `extra_text_label`：メモ欄ラベル（例：備考）。
-  * `extra_text_attend_only`：**出席時のみ**メモ欄を表示するか（0/1）。
   * `created_by_admin`：作成者（`admin_users.id`）。
   * `created_at` / `updated_at`：JST ISO8601。
 * インデックス：`idx_events_held_at` で開催日順の一覧を高速化。
@@ -1475,7 +1477,6 @@ CREATE TABLE events (
   -- 追加メモ欄
   extra_text_enabled      INTEGER NOT NULL DEFAULT 0,  -- 0/1
   extra_text_label        TEXT DEFAULT '備考',
-  extra_text_attend_only  INTEGER NOT NULL DEFAULT 1,  -- 0/1
   created_by_admin INTEGER NOT NULL,
   created_at       TEXT NOT NULL,
   updated_at       TEXT NOT NULL,
@@ -1635,7 +1636,7 @@ awf.technavigation.jp {
 
   * `status` ∈ {attend, absent}
   * `extra_text` は `extra_text_enabled=1` の時のみ受理
-  * `extra_text_attend_only=1` かつ `status='absent'` の場合は無視
+  * `status='attend'`時は`extra_text`必須、`status='absent'`時は任意
 
 ---
 
