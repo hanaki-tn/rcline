@@ -159,6 +159,17 @@ function formatDateTime(isoString) {
     return `${year}/${month}/${day} ${hour}:${minute}`;
 }
 
+// 日付フォーマット（MM/DD）
+function formatDateShort(isoString) {
+    if (!isoString) return '';
+    
+    const date = new Date(isoString);
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    
+    return `${month}/${day}`;
+}
+
 // 日付フォーマット（日付のみ）
 function formatDate(isoString) {
     if (!isoString) return '';
@@ -363,6 +374,7 @@ if (typeof module !== 'undefined' && module.exports) {
         apiRequest,
         getCurrentUser,
         formatDateTime,
+        formatDateShort,
         formatDate,
         formatTime,
         getStatusText,

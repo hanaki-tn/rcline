@@ -13,8 +13,10 @@
         </div>
 
         <!-- ナビゲーション -->
-        <div class="nav" style="display: none;">
-            <!-- ナビゲーションボタンは不要のため非表示 -->
+        <div class="nav" style="display: flex; justify-content: space-between; gap: 10px;">
+            <div style="width: 33%;"></div>
+            <div style="width: 33%;"></div>
+            <button onclick="closeLiff()" class="nav-button" style="width: 33%; text-align: center;">× 閉じる</button>
         </div>
 
         <!-- メインコンテンツ -->
@@ -129,7 +131,7 @@
                 const deadlineDate = event.deadline_at ? formatDate(event.deadline_at) : null;
                 
                 html += `
-                    <a href="detail.html?id=${event.id}" class="event-card">
+                    <a href="detail.html?id=${event.id}&from=list" class="event-card">
                         <div class="event-card-title">${escapeHtml(event.title)}</div>
                         <div class="event-card-datetime">🗓️ ${eventDate} ${eventTime}</div>
                         <div class="event-card-footer">
@@ -170,6 +172,20 @@
         // リフレッシュ機能
         function refreshEvents() {
             loadEvents();
+        }
+
+        // LIFF画面を閉じる
+        function closeLiff() {
+            if (typeof liff !== 'undefined' && liff.isInClient()) {
+                liff.closeWindow();
+            } else {
+                // LIFF外（ブラウザ直接アクセス）の場合はタブを閉じるか戻る
+                if (window.history.length > 1) {
+                    window.history.back();
+                } else {
+                    window.close();
+                }
+            }
         }
 
         // ページ読み込み時実行

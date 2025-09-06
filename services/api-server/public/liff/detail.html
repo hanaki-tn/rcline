@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>イベント詳細 - RC公式LINE</title>
+    <title>イベント詳細 - 浦和北東RC</title>
     <link rel="stylesheet" href="common.css">
 </head>
 <body>
@@ -37,12 +37,14 @@
         let currentUser = null;
         let eventData = null;
         let eventId = null;
+        let fromSource = null; // 遷移元判定用
 
         // ページ初期化
         async function initPage() {
             try {
-                // URLパラメータからイベントIDを取得
+                // URLパラメータからイベントIDと遷移元を取得
                 eventId = getUrlParameter('id');
+                fromSource = getUrlParameter('from'); // 'list' または null/undefined
                 if (!eventId) {
                     showError('main-content', 'イベントIDが指定されていません。');
                     return;
@@ -211,10 +213,13 @@
                                     const proxyMarker = member.via === 'admin' ? ' ✏️' : '';
                                     
                                     return `
-                                        <div class="member-row" style="display: flex; align-items: center; gap: 15px;">
-                                            <div class="member-name" style="flex: 0 0 auto;">${lineStatusEmoji} ${escapeHtml(member.name)}</div>
-                                            <div style="flex: 0 0 auto;">
-                                                <span class="status-badge status-${member.status}">${statusText}${proxyMarker}</span>
+                                        <div class="member-row" style="display: flex; align-items: flex-start; gap: 15px; padding: 8px 0;">
+                                            <div class="member-name" style="flex: 0 0 auto; font-weight: 500;">${lineStatusEmoji} ${escapeHtml(member.name)}</div>
+                                            <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
+                                                <div>
+                                                    <span class="status-badge status-${member.status}">${statusText}${proxyMarker}</span>
+                                                </div>
+                                                ${member.extra_text ? `<div style="font-size: 14px; color: #6c757d; word-wrap: break-word; word-break: break-all;">${escapeHtml(member.extra_text)}</div>` : ''}
                                             </div>
                                         </div>
                                     `;
@@ -243,14 +248,16 @@
                                     return `
                                         <div class="member-row" style="display: flex; align-items: center; gap: 15px; padding: 12px 0;">
                                             <div style="flex: 0 0 auto; font-size: 14px; color: #6c757d;">
-                                                ${formatDateTime(history.responded_at)}
+                                                ${formatDateShort(history.responded_at)}
                                             </div>
                                             <div style="flex: 0 0 auto; font-weight: 500;">
                                                 ${escapeHtml(history.name)}
                                             </div>
                                             <div style="flex: 0 0 auto;">
                                                 <span class="status-badge status-${history.status}">${statusText}${proxyMarker}</span>
-                                                ${history.extra_text ? `<br><small style="color: #6c757d;">${escapeHtml(history.extra_text)}</small>` : ''}
+                                            </div>
+                                            <div style="flex: 1; font-size: 14px; color: #6c757d; white-space: nowrap; overflow: hidden;">
+                                                ${history.extra_text ? escapeHtml(history.extra_text) : ''}
                                             </div>
                                         </div>
                                     `;
@@ -339,14 +346,19 @@
                     })
                 });
 
-                // 成功メッセージ表示
-                const statusText = getStatusText(status);
-                showSuccess('response-message', `${statusText}で回答しました。`);
-                
-                // イベント詳細を再読み込み
-                setTimeout(() => {
-                    loadEventDetail();
-                }, 1000);
+                // 回答成功時の画面遷移
+                if (fromSource === 'list') {
+                    // イベント一覧から来た場合：イベント一覧に戻る
+                    window.location.href = 'index.html';
+                } else {
+                    // LINEメッセージから来た場合：画面を閉じる
+                    if (typeof liff !== 'undefined' && liff.isInClient()) {
+                        liff.closeWindow();
+                    } else {
+                        // LIFF環境外の場合は履歴を戻る
+                        window.history.back();
+                    }
+                }
 
             } catch (error) {
                 console.error('回答送信エラー:', error);
