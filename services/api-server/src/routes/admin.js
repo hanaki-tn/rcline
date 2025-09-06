@@ -701,6 +701,7 @@ router.get('/events/:id/export/history.csv', requireAuth, (req, res) => {
 router.post('/events', requireAuth, upload.single('image'), [
   body('title').notEmpty().isLength({ min: 1, max: 100 }).withMessage('タイトルは1〜100文字で入力してください'),
   body('held_at').isISO8601().withMessage('開催日時は有効な日時形式で入力してください'),
+  body('deadline_at').optional().isISO8601().withMessage('回答期限は有効な日時形式で入力してください'),
   body('body').optional().isLength({ max: 2000 }).withMessage('本文は2000文字以内で入力してください'),
   body('extra_text_enabled').optional().custom(value => value === 'true' || value === 'false' || typeof value === 'boolean').withMessage('追加メモ欄の設定は真偽値で入力してください'),
   body('extra_text_label').optional().isLength({ max: 50 }).withMessage('追加メモ欄のラベルは50文字以内で入力してください'),
@@ -726,7 +727,7 @@ router.post('/events', requireAuth, upload.single('image'), [
   }
 
   try {
-    const { title, held_at, body, extra_text_enabled, extra_text_label, extra_text_attend_only, target_member_ids } = req.body;
+    const { title, held_at, deadline_at, body, extra_text_enabled, extra_text_label, extra_text_attend_only, target_member_ids } = req.body;
     
     // target_member_idsをパース
     let memberIds;
@@ -750,6 +751,23 @@ router.post('/events', requireAuth, upload.single('image'), [
         code: 'INVALID_HELD_AT',
         message: '開催日時は現在以降で設定してください'
       });
+    }
+
+    // 回答期限チェック（開催日時以前）
+    if (deadline_at) {
+      const deadlineDate = new Date(deadline_at);
+      if (deadlineDate > heldAtDate) {
+        return res.status(400).json({
+          code: 'INVALID_DEADLINE',
+          message: '回答期限は開催日時より前に設定してください'
+        });
+      }
+      if (deadlineDate <= now) {
+        return res.status(400).json({
+          code: 'INVALID_DEADLINE',
+          message: '回答期限は現在以降で設定してください'
+        });
+      }
     }
 
     // 画像処理
@@ -784,15 +802,16 @@ router.post('/events', requireAuth, upload.single('image'), [
         // events テーブルに挿入
         const eventSql = `
           INSERT INTO events (
-            title, held_at, body, image_url, image_preview_url,
+            title, held_at, deadline_at, body, image_url, image_preview_url,
             extra_text_enabled, extra_text_label, extra_text_attend_only,
             created_by_admin, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         
         req.db.run(eventSql, [
           title,
           held_at,
+          deadline_at || null,
           defaultBody,
           imageUrl,
           previewImageUrl,

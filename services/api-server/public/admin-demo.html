@@ -878,9 +878,11 @@
                 // 基本情報表示
                 const basicInfoDiv = document.getElementById('event-basic-info');
                 const heldAt = new Date(event.held_at).toLocaleString('ja-JP');
+                const deadlineAt = event.deadline_at ? new Date(event.deadline_at).toLocaleString('ja-JP') : '未設定';
                 basicInfoDiv.innerHTML = `
                     <p><strong>タイトル:</strong> ${event.title}</p>
                     <p><strong>開催日時:</strong> ${heldAt}</p>
+                    <p><strong>回答期限:</strong> ${deadlineAt}</p>
                     <p><strong>本文:</strong></p>
                     <div style="white-space: pre-wrap; background: #f8f9fa; padding: 10px; border-radius: 4px;">${event.body || '-'}</div>
                     <p><strong>追加メモ欄:</strong> ${event.extra_text.enabled ? `有効（${event.extra_text.label}${event.extra_text.attend_only ? ', 出席時のみ表示' : ''}）` : '無効'}</p>
