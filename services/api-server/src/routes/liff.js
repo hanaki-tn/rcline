@@ -440,11 +440,11 @@ router.post('/events/:id/response', requireLineUser, async (req, res) => {
     // 回答を追記型で保存
     const insertSql = `
       INSERT INTO event_responses (event_id, member_id, status, extra_text, responded_at, via)
-      VALUES (?, ?, ?, ?, datetime('now'), 'liff')
+      VALUES (?, ?, ?, ?, ?, 'liff')
     `;
 
     await new Promise((resolve, reject) => {
-      req.db.run(insertSql, [eventId, member.id, status, extra_text], function(err) {
+      req.db.run(insertSql, [eventId, member.id, status, extra_text, nowJST()], function(err) {
         if (err) reject(err);
         else resolve(this.lastID);
       });

@@ -125,9 +125,8 @@
                 const eventDate = formatDate(event.held_at);
                 const eventTime = formatTime(event.held_at);
                 
-                // 回答期限の表示
+                // 回答期限の表示（日付のみ）
                 const deadlineDate = event.deadline_at ? formatDate(event.deadline_at) : null;
-                const deadlineTime = event.deadline_at ? formatTime(event.deadline_at) : null;
                 
                 html += `
                     <a href="detail.html?id=${event.id}" class="event-card">
@@ -135,7 +134,7 @@
                         <div class="event-card-datetime">🗓️ ${eventDate} ${eventTime}</div>
                         <div class="event-card-footer">
                             <span class="status-badge status-${status}">${statusText}</span>
-                            ${status === 'pending' && deadlineDate ? `<span class="event-deadline">回答期限: ${deadlineDate} ${deadlineTime}</span>` : ''}
+                            ${status === 'pending' && deadlineDate ? `<span class="event-deadline">回答期限: ${deadlineDate}</span>` : ''}
                         </div>
                     </a>
                 `;

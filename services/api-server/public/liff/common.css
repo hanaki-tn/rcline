@@ -220,18 +220,18 @@ a.event-card:active {
 }
 
 .status-badge.status-pending {
-    background-color: #e9ecef;
-    color: #6c757d;
+    background-color: #FFA500;  /* オレンジ */
+    color: #ffffff;
 }
 
 .status-badge.status-attend {
-    background-color: #d4edda;
-    color: #155724;
+    background-color: #28a745;  /* 緑 */
+    color: #ffffff;
 }
 
 .status-badge.status-absent {
-    background-color: #f8d7da;
-    color: #721c24;
+    background-color: #6c757d;  /* 灰色 */
+    color: #ffffff;
 }
 
 /* 締切日時（今後の実装用） */
@@ -314,6 +314,19 @@ a.event-card:active {
     font-size: 14px;
     font-weight: 500;
     margin-left: 10px;
+}
+
+/* ステータスごとの色（詳細画面用） */
+.member-status.status-pending {
+    color: #FFA500;  /* オレンジ */
+}
+
+.member-status.status-attend {
+    color: #28a745;  /* 緑 */
+}
+
+.member-status.status-absent {
+    color: #6c757d;  /* 灰色 */
 }
 
 /* 折りたたみ */

@@ -54,7 +54,7 @@ CREATE TABLE events (
   title            TEXT NOT NULL,
   body             TEXT,
   held_at          TEXT NOT NULL,           -- JST ISO8601
-  deadline_at      TEXT,                    -- NULL（今回未使用）
+  deadline_at      TEXT,                    -- JST ISO8601
   -- 添付（JPG）
   image_url        TEXT,                          -- オリジナルJPGの公開URL
   image_size       INTEGER,                       -- バイト

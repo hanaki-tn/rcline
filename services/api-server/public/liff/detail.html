@@ -9,8 +9,10 @@
 <body>
     <div class="container">
         <!-- ナビゲーション -->
-        <div class="nav">
-            <a href="index.html" class="nav-button" style="display: inline-block; width: auto; padding: 8px 12px;">← 戻る</a>
+        <div class="nav" style="display: flex; justify-content: space-between; gap: 10px;">
+            <a href="index.html" class="nav-button" style="width: 33%; text-align: center;">← イベント一覧</a>
+            <div style="width: 33%;"></div>
+            <button onclick="closeLiff()" class="nav-button" style="width: 33%; text-align: center;">× 閉じる</button>
         </div>
 
         <div class="header">
@@ -206,10 +208,10 @@
                                     const proxyMarker = member.via === 'admin' ? ' ✏️' : '';
                                     
                                     return `
-                                        <div class="member-row">
-                                            <div class="member-name">${lineStatusEmoji} ${escapeHtml(member.name)}</div>
-                                            <div class="member-status ${statusClass}">
-                                                ${statusText}${proxyMarker}
+                                        <div class="member-row" style="display: flex; align-items: center; gap: 15px;">
+                                            <div class="member-name" style="flex: 0 0 auto;">${lineStatusEmoji} ${escapeHtml(member.name)}</div>
+                                            <div style="flex: 0 0 auto;">
+                                                <span class="status-badge status-${member.status}">${statusText}${proxyMarker}</span>
                                             </div>
                                         </div>
                                     `;
@@ -236,14 +238,16 @@
                                     const proxyMarker = history.via === 'admin' ? ' ✏️' : '';
                                     
                                     return `
-                                        <div class="member-row">
-                                            <div class="member-name">
-                                                ${formatDateTime(history.responded_at)}<br>
-                                                <small>${escapeHtml(history.name)}</small>
+                                        <div class="member-row" style="display: flex; align-items: center; gap: 15px; padding: 12px 0;">
+                                            <div style="flex: 0 0 auto; font-size: 14px; color: #6c757d;">
+                                                ${formatDateTime(history.responded_at)}
                                             </div>
-                                            <div class="member-status ${statusClass}">
-                                                ${statusText}${proxyMarker}
-                                                ${history.extra_text ? `<br><small>${escapeHtml(history.extra_text)}</small>` : ''}
+                                            <div style="flex: 0 0 auto; font-weight: 500;">
+                                                ${escapeHtml(history.name)}
+                                            </div>
+                                            <div style="flex: 0 0 auto;">
+                                                <span class="status-badge status-${history.status}">${statusText}${proxyMarker}</span>
+                                                ${history.extra_text ? `<br><small style="color: #6c757d;">${escapeHtml(history.extra_text)}</small>` : ''}
                                             </div>
                                         </div>
                                     `;
@@ -379,6 +383,20 @@
                 .replace(/>/g, "&gt;")
                 .replace(/"/g, "&quot;")
                 .replace(/'/g, "&#039;");
+        }
+
+        // LIFF画面を閉じる
+        function closeLiff() {
+            if (typeof liff !== 'undefined' && liff.isInClient()) {
+                liff.closeWindow();
+            } else {
+                // LIFF外（ブラウザ直接アクセス）の場合はタブを閉じるか戻る
+                if (window.history.length > 1) {
+                    window.history.back();
+                } else {
+                    window.close();
+                }
+            }
         }
 
         // ページ読み込み時実行

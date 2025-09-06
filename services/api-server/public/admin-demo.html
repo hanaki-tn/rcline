@@ -173,12 +173,12 @@
                         
                         <div class="form-group">
                             <label for="event-deadline-at">回答期限（必須）:</label>
-                            <input type="datetime-local" id="event-deadline-at" name="deadline_at" required>
+                            <input type="date" id="event-deadline-at" name="deadline_at" required>
                         </div>
                         
                         <div class="form-group">
                             <label for="event-body">本文:</label>
-                            <textarea id="event-body" name="body" rows="3" maxlength="2000" placeholder="出欠のご回答をお願いします。&#10;詳細・回答は以下のリンクからご確認ください。"></textarea>
+                            <textarea id="event-body" name="body" rows="3" maxlength="2000">出欠のご回答をお願いします。</textarea>
                         </div>
                         
                         <div class="form-group">
@@ -804,13 +804,12 @@
                 formData.append('held_at', iso8601);
             }
             
-            // 回答期限の処理（JSTに変換）
+            // 回答期限の処理（日付のみ → 23:59:59 JSTに変換）
             const deadlineAtInput = document.getElementById('event-deadline-at');
             if (deadlineAtInput.value) {
-                const localDateTime = new Date(deadlineAtInput.value);
-                const jstDateTime = new Date(localDateTime.getTime() - localDateTime.getTimezoneOffset() * 60000);
-                const iso8601 = jstDateTime.toISOString().slice(0, 19) + '+09:00';
-                formData.append('deadline_at', iso8601);
+                // 日付に23:59:59を付与してJST形式に変換
+                const deadlineDate = deadlineAtInput.value + 'T23:59:59+09:00';
+                formData.append('deadline_at', deadlineDate);
             }
             
             // チェックボックスの値を明示的にboolean文字列で追加
