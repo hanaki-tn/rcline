@@ -179,12 +179,12 @@
             if (typeof liff !== 'undefined' && liff.isInClient()) {
                 liff.closeWindow();
             } else {
-                // LIFF外（ブラウザ直接アクセス）の場合はタブを閉じるか戻る
-                if (window.history.length > 1) {
-                    window.history.back();
-                } else {
-                    window.close();
-                }
+                // LIFF外（ブラウザ直接アクセス）の場合
+                window.close();
+                // window.close()が効かない場合は空白ページへ遷移
+                setTimeout(() => {
+                    window.location.href = 'about:blank';
+                }, 100);
             }
         }
 
