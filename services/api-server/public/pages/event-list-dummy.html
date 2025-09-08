@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>イベント - 浦和北東RC</title>
+    <link rel="stylesheet" href="../liff/common.css?v=20250901-1">
+    <style>
+        /* 閉じるボタンのカーソル */
+        .nav-button {
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>イベント</h1>
+        </div>
+
+        <!-- ナビゲーション -->
+        <div class="nav" style="display: flex; justify-content: space-between; gap: 10px;">
+            <div style="width: 33%;"></div>
+            <div style="width: 33%;"></div>
+            <button onclick="closeLiff()" class="nav-button" style="width: 33%; text-align: center;">× 閉じる</button>
+        </div>
+
+        <!-- メインコンテンツ（空状態表示） -->
+        <div id="main-content">
+            <div class="empty-state">
+                <div class="empty-state-icon">📅</div>
+                <div>現在、表示できるイベントはありません。</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // LIFF画面を閉じる（静的版）
+        function closeLiff() {
+            // LINEアプリ内の場合はLIFF SDKのcloseWindowを試みる
+            if (typeof liff !== 'undefined' && typeof liff.closeWindow === 'function') {
+                try {
+                    liff.closeWindow();
+                } catch (e) {
+                    // エラーが発生した場合は通常の閉じる処理へ
+                }
+            }
+            
+            // 通常のブラウザでの閉じる処理
+            window.close();
+            
+            // window.close()が効かない場合は空白ページへ遷移
+            setTimeout(() => {
+                window.location.href = 'about:blank';
+            }, 100);
+        }
+    </script>
+</body>
+</html>
