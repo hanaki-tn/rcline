@@ -12,7 +12,8 @@
     "insert-member": "node scripts/insert-member.js",
     "fix-member": "node scripts/fix-member-data.js",
     "test-linking": "node scripts/test-linking.js",
-    "extract-unlinked-users": "node scripts/extract-unlinked-users.js"
+    "extract-unlinked-users": "node scripts/extract-unlinked-users.js",
+    "get-followers": "node scripts/get-line-followers.js"
   },
   "dependencies": {
     "@line/bot-sdk": "^10.2.0",
