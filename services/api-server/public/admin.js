@@ -374,7 +374,7 @@ function initializeEventForm() {
     form.onsubmit = async function(e) {
         e.preventDefault();
         
-        confirmAction('イベントを作成して送信しますか？', async () => {
+        confirmAction('公式LINEへ送信しますか？', async () => {
             await createEvent();
         });
     };
@@ -538,7 +538,7 @@ async function updateTargetPreview() {
         let html = `<p><strong>対象: ${targetMembers.length}名</strong></p>`;
         html += '<div style="max-height: 150px; overflow-y: auto; border: 1px solid #ddd; padding: 5px; border-radius: 6px;">';
         targetMembers.forEach(member => {
-            html += `<div>${member.name} (${member.role})</div>`;
+            html += `<div>${member.name}</div>`;
         });
         html += '</div>';
         
@@ -568,6 +568,9 @@ async function loadEventDetail() {
         if (!response.ok) throw new Error('認証が必要です');
         
         const event = await response.json();
+        
+        // グローバルに保存（代理回答用）
+        window.currentEventData = event;
         
         // 基本情報
         const basicInfoDiv = document.getElementById('event-basic-info');
@@ -653,9 +656,24 @@ function displayAttendanceStatus(statusData, canProxyRespond = false) {
                 <td>${respondedAt}</td>`;
             
             if (canProxyRespond) {
-                html += `<td>
-                    <button onclick="proxyRespond(${member.member_id}, '${member.name}', 'attend')" class="success" style="padding: 4px 8px; font-size: 12px;">出席代理</button>
-                    <button onclick="proxyRespond(${member.member_id}, '${member.name}', 'absent')" class="danger" style="padding: 4px 8px; font-size: 12px;">欠席代理</button>
+                const extraTextEnabled = window.currentEventData?.extra_text?.enabled || false;
+                const extraTextLabel = window.currentEventData?.extra_text?.label || '備考';
+                
+                html += `<td>`;
+                
+                // 追加メモ欄が有効な場合はテキスト入力欄を表示
+                if (extraTextEnabled) {
+                    html += `
+                        <input type="text" id="proxy-text-${member.member_id}" 
+                               placeholder="${extraTextLabel}" 
+                               style="width: 120px; margin-right: 5px; padding: 4px; font-size: 12px;"
+                               value="${member.extra_text || ''}">
+                    `;
+                }
+                
+                html += `
+                    <button onclick="proxyRespond(${member.member_id}, '${member.name}', 'attend')" class="success" style="padding: 4px 8px; font-size: 12px; color: white;">出席代理</button>
+                    <button onclick="proxyRespond(${member.member_id}, '${member.name}', 'absent')" class="danger" style="padding: 4px 8px; font-size: 12px; color: white;">欠席代理</button>
                 </td>`;
             }
             
@@ -688,8 +706,23 @@ function getStatusText(status) {
 async function proxyRespond(memberId, memberName, status) {
     const statusText = getStatusText(status);
     
+    // 追加メモ欄が有効な場合はテキストを取得
+    let extraText = '';
+    const extraTextEnabled = window.currentEventData?.extra_text?.enabled || false;
+    if (extraTextEnabled) {
+        const textInput = document.getElementById(`proxy-text-${memberId}`);
+        if (textInput) {
+            extraText = textInput.value.trim();
+        }
+    }
+    
+    let confirmMsg = `${memberName}さんの代理で「${statusText}」を登録しますか？`;
+    if (extraText) {
+        confirmMsg += `\n${window.currentEventData?.extra_text?.label || '備考'}: ${extraText}`;
+    }
+    
     confirmAction(
-        `${memberName}さんの代理で「${statusText}」を登録しますか？`,
+        confirmMsg,
         async () => {
             try {
                 const response = await fetch(`/api/admin/events/${currentEventId}/proxy-response`, {
@@ -699,7 +732,7 @@ async function proxyRespond(memberId, memberName, status) {
                     body: JSON.stringify({
                         member_id: memberId,
                         status: status,
-                        extra_text: ''
+                        extra_text: extraText
                     })
                 });
                 
@@ -857,24 +890,7 @@ async function loadAudienceMembers() {
         
         const currentData = await currentResponse.json();
         
-        // 現在の所属メンバー表示
-        const currentDiv = document.getElementById('current-members');
-        if (currentData.items.length === 0) {
-            currentDiv.innerHTML = '<p>所属メンバーはいません</p>';
-        } else {
-            let html = '<table><thead><tr><th>名前</th><th>役割</th><th>LINE紐付け</th></tr></thead><tbody>';
-            currentData.items.forEach(member => {
-                html += `<tr>
-                    <td>${member.name}</td>
-                    <td><span class="badge badge-${member.role}">${member.role}</span></td>
-                    <td><span class="badge badge-${member.line_user_id_present ? 'linked' : 'unlinked'}">${member.line_user_id_present ? '紐付け済み' : '未紐付け'}</span></td>
-                </tr>`;
-            });
-            html += '</tbody></table>';
-            currentDiv.innerHTML = html;
-        }
-        
-        // 全メンバー取得
+        // 全メンバー取得（role=memberのみ）
         const allResponse = await fetch('/api/admin/members?role=member', {
             credentials: 'include'
         });
@@ -887,22 +903,32 @@ async function loadAudienceMembers() {
         const selectionDiv = document.getElementById('member-selection');
         window.audienceMembersList = allData.items; // フィルター用に保存
         
-        let selectionHtml = '';
+        // 統合リスト（チェックボックス + LINE状態 + 名前）
+        let selectionHtml = '<table style="width: 100%;"><thead><tr>';
+        selectionHtml += '<th style="width: 30px;"></th>'; // チェックボックス列
+        selectionHtml += '<th style="width: 30px;">LINE</th>';  // LINE紐付け状態
+        selectionHtml += '<th>名前</th>';
+        selectionHtml += '</tr></thead><tbody>';
+        
         allData.items.forEach(member => {
             const isSelected = currentMemberIds.has(member.id);
+            const lineStatus = member.line_user_id_present ? '🟢' : '⚪';
+            
             selectionHtml += `
-                <div class="member-checkbox-item" style="margin: 5px 0;">
-                    <label>
+                <tr class="member-checkbox-item">
+                    <td style="text-align: center;">
                         <input type="checkbox" name="member-checkbox" value="${member.id}" ${isSelected ? 'checked' : ''}>
-                        ${member.name} (${member.role}) ${member.line_user_id_present ? '✓' : '✗'}
-                    </label>
-                </div>
+                    </td>
+                    <td style="text-align: center;">${lineStatus}</td>
+                    <td>${member.name}</td>
+                </tr>
             `;
         });
+        
+        selectionHtml += '</tbody></table>';
         selectionDiv.innerHTML = selectionHtml;
         
     } catch (error) {
-        document.getElementById('current-members').innerHTML = `<div class="error">エラー: ${error.message}</div>`;
         document.getElementById('member-selection').innerHTML = `<div class="error">エラー: ${error.message}</div>`;
     }
 }

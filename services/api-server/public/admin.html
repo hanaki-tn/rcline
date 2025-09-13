@@ -528,22 +528,6 @@
             <div id="members-section" class="card hidden">
                 <h3>会員一覧</h3>
                 
-                <!-- 検索・フィルター -->
-                <div class="d-flex gap-2" style="align-items: center; margin-bottom: 20px;">
-                    <div class="search-box">
-                        <input type="text" id="member-search" placeholder="名前で検索..." onkeyup="filterMembers()">
-                    </div>
-                    <select id="role-filter" onchange="filterMembers()" class="input-small">
-                        <option value="">全ての役割</option>
-                        <option value="member" selected>member のみ</option>
-                        <option value="staff">staff のみ</option>
-                    </select>
-                    <select id="line-filter" onchange="filterMembers()" class="input-small">
-                        <option value="">LINE状態</option>
-                        <option value="linked">紐付け済み</option>
-                        <option value="unlinked">未紐付け</option>
-                    </select>
-                </div>
                 
                 <div class="table-container">
                     <table id="members-table">
@@ -607,12 +591,6 @@
                     <div class="form-group">
                         <h4>配信対象選択</h4>
                         <div id="audience-selection">
-                            <div style="margin: 10px 0;">
-                                <label>
-                                    <input type="checkbox" id="select-all-members" onchange="toggleAllMembers()">
-                                    全員
-                                </label>
-                            </div>
                             <div id="audience-checkboxes">読み込み中...</div>
                         </div>
                     </div>
@@ -620,7 +598,6 @@
                     <div class="form-group">
                         <h4>受信者プレビュー</h4>
                         <div id="target-preview">配信対象を選択してください</div>
-                        <button type="button" onclick="updateTargetPreview()">プレビュー更新</button>
                     </div>
                     
                     <button type="submit" id="event-create-button">イベント作成＆送信</button>
@@ -700,20 +677,14 @@
                 <h3>会員グループメンバー管理</h3>
                 <div id="audience-info">
                     <h4 id="current-audience-name">-</h4>
-                    <button onclick="showSection('audience-list')">← グループ一覧に戻る</button>
                 </div>
                 
                 <div class="form-group">
-                    <h4>現在の所属メンバー</h4>
-                    <div id="current-members">読み込み中...</div>
-                </div>
-                
-                <div class="form-group">
-                    <h4>メンバー選択</h4>
+                    <h4>メンバー管理</h4>
                     <div class="search-box mb-3">
                         <input type="text" id="member-select-search" placeholder="名前で絞り込み..." onkeyup="filterMemberSelection()">
                     </div>
-                    <div style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; border-radius: 6px;">
+                    <div style="max-height: 400px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; border-radius: 6px;">
                         <div id="member-selection">読み込み中...</div>
                     </div>
                     <button onclick="saveAudienceMembers()" style="margin-top: 10px;">選択したメンバーを保存</button>
@@ -761,7 +732,6 @@
                 <div class="form-group">
                     <h4>CSV出力</h4>
                     <button onclick="downloadCSV('latest')" id="csv-latest-btn">最新状態をダウンロード</button>
-                    <button onclick="downloadCSV('history')" id="csv-history-btn">回答履歴をダウンロード</button>
                 </div>
             </div>
         </div>
