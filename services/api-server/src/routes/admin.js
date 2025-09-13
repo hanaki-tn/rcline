@@ -580,6 +580,7 @@ router.get('/events/:id', requireAuth, (req, res) => {
           id: event.id,
           title: event.title,
           held_at: event.held_at,
+          deadline_at: event.deadline_at,
           body: event.body,
           image_url: event.image_url,
           image_preview_url: event.image_preview_url,
