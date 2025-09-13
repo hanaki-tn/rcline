@@ -203,11 +203,8 @@ function sortTable(tableId, column, type = 'text') {
 
 // ========== 会員管理 ==========
 async function loadMembers() {
-    const role = document.getElementById('role-filter')?.value || 'member';
-    const params = role ? `?role=${role}` : '';
-
     try {
-        const response = await fetch(`/api/admin/members${params}`, {
+        const response = await fetch('/api/admin/members', {
             credentials: 'include'
         });
 
@@ -258,7 +255,7 @@ function filterMembers() {
 // ========== イベント管理 ==========
 async function loadEvents() {
     try {
-        const response = await fetch('/api/admin/events', {
+        const response = await fetch('/api/admin/events?sort=id_desc', {
             credentials: 'include'
         });
         
@@ -905,7 +902,7 @@ async function loadAudienceMembers() {
         
         // 統合リスト（チェックボックス + LINE状態 + 名前）
         let selectionHtml = '<table style="width: 100%;"><thead><tr>';
-        selectionHtml += '<th style="width: 30px;"></th>'; // チェックボックス列
+        selectionHtml += '<th style="width: 30px;"><input type="checkbox" id="select-all-members" onchange="toggleAllMemberSelection()"></th>'; // 全選択チェックボックス列
         selectionHtml += '<th style="width: 30px;">LINE</th>';  // LINE紐付け状態
         selectionHtml += '<th>名前</th>';
         selectionHtml += '</tr></thead><tbody>';
@@ -933,13 +930,13 @@ async function loadAudienceMembers() {
     }
 }
 
-function filterMemberSelection() {
-    const searchText = document.getElementById('member-select-search').value.toLowerCase();
-    const items = document.querySelectorAll('.member-checkbox-item');
+// 全選択/全解除の制御関数
+function toggleAllMemberSelection() {
+    const selectAll = document.getElementById('select-all-members');
+    const checkboxes = document.querySelectorAll('input[name="member-checkbox"]');
     
-    items.forEach(item => {
-        const label = item.querySelector('label').textContent.toLowerCase();
-        item.style.display = label.includes(searchText) ? 'block' : 'none';
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = selectAll.checked;
     });
 }
 
