@@ -14,7 +14,7 @@ services:
       - DATABASE_PATH=/app/data/rcline.db
       - FILES_BASE_PATH=/app/files
       - LOGS_BASE_PATH=/app/logs
-      - FILES_PUBLIC_URL_BASE=${FILES_PUBLIC_URL_BASE:-http://localhost/files}
+      - FILES_PUBLIC_URL_BASE=${FILES_PUBLIC_URL_BASE:-http://localhost:4000/files}
       - REDIS_URL=redis://redis:6379
       - ONBOARDING_MODE=${ONBOARDING_MODE:-silent}
       - ONBOARDING_NAME_NFKC=${ONBOARDING_NAME_NFKC:-0}
@@ -28,6 +28,7 @@ services:
       - ADMIN_USERNAME=${ADMIN_USERNAME}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - DEV_ALLOW_INSECURE=${DEV_ALLOW_INSECURE:-1}
+      - DEV_PUSH_DISABLE=${DEV_PUSH_DISABLE:-1}  # 開発環境ではLINE送信を無効化
     volumes:
       - sqlite_data:/app/data
       - files_storage:/app/files
@@ -62,18 +63,19 @@ services:
     depends_on:
       - redis  # caddyからredisに変更（開発時の起動問題回避）
 
-  caddy:
-    image: caddy:2
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-      - files_storage:/var/www/files:ro
-    networks: [rcline]
+  # Caddyは開発環境では使用しない（直接ポートアクセス）
+  # caddy:
+  #   image: caddy:2
+  #   restart: unless-stopped
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+  #     - caddy_data:/data
+  #     - caddy_config:/config
+  #     - files_storage:/var/www/files:ro
+  #   networks: [rcline]
 
 networks:
   rcline: {}

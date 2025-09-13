@@ -1,19 +1,178 @@
-// RC公式LINE LIFF 共通JavaScript
+// RC公式LINE LIFF 共通JavaScript（VPS本番用）
+
+// 二重実行防止
+if (window.__RCL_INIT_LOCK__) { console.warn('INIT locked'); } else { window.__RCL_INIT_LOCK__ = true; }
 
 // 共通設定
 const CONFIG = {
-    API_BASE: '',  // 相対パス使用
-    DEV_USER_ID: 'U45bc8ea2cb931b9ff43aa41559dbc7fc', // 開発用テストユーザーID（花木さん）
-    isDev: window.location.hostname === 'localhost'
+    API_BASE: window.location.hostname === 'localhost' ? '' : '/rcline',  // ローカルは相対パス、VPSは/rcline
+    DEV_USER_ID: 'U45bc8ea2cb931b9ff43aa41559dbc7fc',
+    isDev: window.location.hostname === 'localhost',  // 環境判定
+    LIFF_ID: '2007866921-LkR3yg4k',  // 出欠状況確認LIFF ID
+    showDebugUI: false  // 画面デバッグを出すか（?debug=1で上書き可能）
 };
 
-// セッションキャッシュ設定
-const SESSION_STORAGE = {
-    USER_INFO: 'liff_user_info',
-    LIFF_PROFILE: 'liff_profile',
-    USER_EXPIRES: 'liff_user_expires',
-    PROFILE_EXPIRES: 'liff_profile_expires'
-};
+// ★ デバッグログ表示機能（画面上）
+function showDebugLog(message, type = 'info') {
+    // 画面UIは条件付き。コンソールは常に維持。
+    const allowUI = CONFIG.showDebugUI || /(^|[?&])debug=1(&|$)/.test(location.search);
+    console.log(`[DEBUG] ${message}`);
+
+    if (!allowUI) return; // 本番ではUIを出さない
+
+    const debugArea = document.getElementById('debug-log') || createDebugArea();
+    const timestamp = new Date().toLocaleTimeString();
+    const logEntry = document.createElement('div');
+    logEntry.className = `debug-entry debug-${type}`;
+    logEntry.innerHTML = `[${timestamp}] ${type.toUpperCase()}: ${message}`;
+    debugArea.appendChild(logEntry);
+    debugArea.scrollTop = debugArea.scrollHeight;
+}
+
+function createDebugArea() {
+    const debugArea = document.createElement('div');
+    debugArea.id = 'debug-log';
+    debugArea.style.cssText = `
+        position: fixed; bottom: 0; left: 0; right: 0; height: 200px;
+        background: #000; color: #0f0; font-family: monospace; font-size: 10px;
+        overflow-y: scroll; z-index: 9999; border-top: 2px solid #0f0;
+        padding: 5px; box-sizing: border-box;
+    `;
+    
+    // 閉じるボタン追加
+    const closeBtn = document.createElement('button');
+    closeBtn.innerHTML = '×';
+    closeBtn.style.cssText = `
+        position: absolute; top: 2px; right: 5px; background: #f00; color: #fff;
+        border: none; width: 20px; height: 16px; cursor: pointer; font-size: 12px;
+    `;
+    closeBtn.onclick = () => debugArea.style.display = 'none';
+    debugArea.appendChild(closeBtn);
+    
+    document.body.appendChild(debugArea);
+    showDebugLog('デバッグログ開始', 'system');
+    return debugArea;
+}
+
+// LIFF初期化
+let liffInitialized = false;
+async function initLiff() {
+    if (liffInitialized) return true;
+    
+    // 開発環境ではLIFF初期化をスキップ
+    if (CONFIG.isDev) {
+        showDebugLog('開発環境 - LIFF初期化をスキップ', 'info');
+        liffInitialized = true;
+        return true;
+    }
+    
+    try {
+        showDebugLog(`LIFF初期化開始 - ID: ${CONFIG.LIFF_ID}`, 'info');
+        
+        // LIFF SDKの読み込み診断
+        showDebugLog(`window.liffSdkLoaded: ${window.liffSdkLoaded}`, 'info');
+        showDebugLog(`window.liffSdkLoadError: ${window.liffSdkLoadError}`, 'info');
+        showDebugLog(`typeof liff: ${typeof liff}`, 'info');
+        
+        // スクリプトタグの存在確認
+        const liffScripts = document.querySelectorAll('script[src*="liff"]');
+        showDebugLog(`LIFF関連script要素数: ${liffScripts.length}`, 'info');
+        liffScripts.forEach((script, index) => {
+            showDebugLog(`Script ${index + 1}: ${script.src} (loaded: ${script.readyState})`, 'info');
+        });
+        
+        // LIFF SDKの存在確認
+        if (typeof liff === 'undefined') {
+            showDebugLog('LIFF SDK未読み込み', 'error');
+            if (window.liffSdkLoadError) {
+                showDebugLog('SDK読み込みでonerrorが発生', 'error');
+            } else if (!window.liffSdkLoaded) {
+                showDebugLog('SDKのonloadイベント未発火', 'error');
+            }
+            throw new Error('LIFF SDK not loaded');
+        }
+        
+        showDebugLog('LIFF SDK読み込み確認OK', 'success');
+        
+        await liff.init({ liffId: CONFIG.LIFF_ID });
+        showDebugLog('liff.init()完了', 'success');
+        
+        await liff.ready; // ★ 初期化完了を待つ
+        showDebugLog('liff.ready完了', 'success');
+        
+        // --- ログイン分岐ロジック ---
+        const inClient  = typeof liff.isInClient  === 'function' ? liff.isInClient()  : false;
+        const loggedIn  = typeof liff.isLoggedIn  === 'function' ? liff.isLoggedIn()  : false;
+        showDebugLog(`inClient: ${inClient}, loggedIn: ${loggedIn}`, 'info');
+
+        // LINEアプリ内ならログイン不要（ここで login() しない）
+        if (inClient) {
+            showDebugLog('Running in LINE client. Skip liff.login().', 'success');
+        } else {
+            // 外部ブラウザなら未ログイン時のみ login。戻り先を明示
+            if (!loggedIn) {
+                const redirect = location.href;
+                showDebugLog(`Not in client & not logged in → liff.login({redirectUri:${redirect}})`, 'warn');
+                liff.login({ redirectUri: redirect });
+                return false; // ここで一旦終了（遷移）
+            }
+        }
+
+        showDebugLog('LIFF 初期化完了', 'success');
+        liffInitialized = true;
+        return true;
+        
+    } catch (error) {
+        showDebugLog(`LIFF初期化失敗: ${error.message}`, 'error');
+        showDebugLog(`エラー詳細: ${error.stack}`, 'error');
+        throw error;
+    }
+}
+
+// ★ プロフィールを1度だけ取得して userId をキャッシュ
+let cachedUserId = null;
+async function ensureLineUserId() {
+    // 開発環境では固定IDを返す
+    if (CONFIG.isDev) {
+        const devUserId = localStorage.getItem('dev-line-user-id') || CONFIG.DEV_USER_ID;
+        showDebugLog(`開発環境userId: ${devUserId}`, 'info');
+        return devUserId;
+    }
+    
+    try {
+        showDebugLog('ensureLineUserId開始', 'info');
+        
+        if (!liffInitialized) {
+            showDebugLog('LIFF未初期化 - initLiff実行', 'info');
+            const ok = await initLiff();
+            if (!ok) {
+                showDebugLog('initLiff失敗 - ログイン遷移中', 'warn');
+                return null; // ログイン遷移
+            }
+        }
+        
+        if (!liff.isLoggedIn()) {
+            showDebugLog('LIFFログイン状態がfalse', 'warn');
+            return null;
+        }
+        
+        if (cachedUserId) {
+            showDebugLog(`キャッシュからuserId取得: ${cachedUserId}`, 'info');
+            return cachedUserId;
+        }
+        
+        showDebugLog('liff.getProfile()実行中', 'info');
+        const profile = await liff.getProfile();
+        cachedUserId = profile?.userId || null;
+        showDebugLog(`プロフィール取得完了: ${cachedUserId}`, 'success');
+        
+        return cachedUserId;
+        
+    } catch (error) {
+        showDebugLog(`ensureLineUserId失敗: ${error.message}`, 'error');
+        return null;
+    }
+}
 
 // API リクエストヘルパー
 async function apiRequest(endpoint, options = {}) {
@@ -22,125 +181,107 @@ async function apiRequest(endpoint, options = {}) {
         ...options.headers
     };
     
-    // 開発環境では擬似LINE user IDを使用
+    // 環境別認証ヘッダー設定
     if (CONFIG.isDev) {
-        // localStorageから開発用userIdを取得、なければデフォルト値を使用
+        // ローカル開発環境：固定のdev user idを使用
         const devUserId = localStorage.getItem('dev-line-user-id') || CONFIG.DEV_USER_ID;
         headers['x-dev-line-user-id'] = devUserId;
+        showDebugLog(`開発環境認証: ${devUserId}`, 'info');
+    } else {
+        // VPS本番環境：LIFF からトークン取得＋ユーザーIDを送る
+        try {
+            showDebugLog(`APIリクエスト認証ヘッダ設定開始: ${endpoint}`, 'info');
+            
+            if (liffInitialized && liff.isLoggedIn()) {
+                const accessToken = liff.getAccessToken();
+                if (accessToken) {
+                    headers['Authorization'] = `Bearer ${accessToken}`;
+                    showDebugLog(`アクセストークン設定完了: ${accessToken ? accessToken.substring(0, 10) + '...' : 'N/A'}`, 'info');
+                }
+            }
+            
+            // ★ サーバ認証の本命：x-line-user-id を必ず付与
+            showDebugLog('LINE userId取得開始', 'info');
+            const uid = await ensureLineUserId();
+            if (!uid) {
+                showDebugLog('LINE user id取得失敗', 'error');
+                throw new Error('LINE user id not available');
+            }
+            headers['x-line-user-id'] = uid;
+            showDebugLog(`x-line-user-id設定完了: ${uid}`, 'success');
+            
+        } catch (error) {
+            showDebugLog(`認証ヘッダ設定エラー: ${error.message}`, 'error');
+            throw error; // エラーを再スローしてAPIリクエスト停止
+        }
     }
     
     try {
+        showDebugLog(`fetch実行: ${CONFIG.API_BASE}${endpoint}`, 'info');
         const response = await fetch(CONFIG.API_BASE + endpoint, {
             ...options,
             headers
         });
         
+        showDebugLog(`fetch応答: ${response.status} ${response.statusText}`, response.ok ? 'success' : 'error');
+        
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
+            showDebugLog(`APIエラー詳細: ${JSON.stringify(errorData)}`, 'error');
             throw new Error(errorData.message || `HTTP ${response.status}`);
         }
         
+        showDebugLog(`APIリクエスト成功: ${endpoint}`, 'success');
         return response;
+        
     } catch (error) {
-        console.error(`API Error [${endpoint}]:`, error);
-        
-        // 認証エラー時はキャッシュクリア
-        if (error.message.includes('401') || error.message.includes('UNAUTHENTICATED')) {
-            clearAuthCache();
-        }
-        
+        showDebugLog(`fetch失敗: ${error.message}`, 'error');
         throw error;
     }
 }
 
-// キャッシュクリア関数
-function clearAuthCache() {
-    sessionStorage.removeItem(SESSION_STORAGE.USER_INFO);
-    sessionStorage.removeItem(SESSION_STORAGE.LIFF_PROFILE);
-    sessionStorage.removeItem(SESSION_STORAGE.USER_EXPIRES);
-    sessionStorage.removeItem(SESSION_STORAGE.PROFILE_EXPIRES);
-    console.log('[CACHE] 認証キャッシュをクリアしました');
-}
-
-// セッションキャッシュから取得（期限チェック付き）
-function getFromSessionCache(key, expiresKey) {
-    try {
-        const cached = sessionStorage.getItem(key);
-        const expires = sessionStorage.getItem(expiresKey);
-        
-        if (cached && expires && Date.now() < parseInt(expires)) {
-            console.log(`[CACHE] ${key} をキャッシュから取得`);
-            return JSON.parse(cached);
-        }
-        
-        // 期限切れの場合はクリア
-        if (cached) {
-            sessionStorage.removeItem(key);
-            sessionStorage.removeItem(expiresKey);
-            console.log(`[CACHE] ${key} の期限切れキャッシュをクリア`);
-        }
-        
-        return null;
-    } catch (error) {
-        console.error(`[CACHE] ${key} 読み込みエラー:`, error);
-        return null;
-    }
-}
-
-// セッションキャッシュに保存（1時間有効）
-function saveToSessionCache(key, expiresKey, data) {
-    try {
-        const expires = Date.now() + (60 * 60 * 1000); // 1時間
-        sessionStorage.setItem(key, JSON.stringify(data));
-        sessionStorage.setItem(expiresKey, expires.toString());
-        console.log(`[CACHE] ${key} をキャッシュに保存（期限: ${new Date(expires).toLocaleString()}）`);
-    } catch (error) {
-        console.error(`[CACHE] ${key} 保存エラー:`, error);
-    }
-}
-
-// LIFF プロフィール取得（キャッシュ付き）
-async function getCachedLiffProfile() {
-    // キャッシュ確認
-    let profile = getFromSessionCache(SESSION_STORAGE.LIFF_PROFILE, SESSION_STORAGE.PROFILE_EXPIRES);
-    if (profile) {
-        return profile;
-    }
-    
-    // キャッシュなし：LIFF SDKから取得
-    try {
-        if (typeof liff !== 'undefined' && liff.isLoggedIn && liff.isLoggedIn()) {
-            profile = await liff.getProfile();
-            saveToSessionCache(SESSION_STORAGE.LIFF_PROFILE, SESSION_STORAGE.PROFILE_EXPIRES, profile);
-            return profile;
-        }
-        return null;
-    } catch (error) {
-        console.error('LIFF プロフィール取得エラー:', error);
-        return null;
-    }
-}
-
-// 現在のユーザー情報を取得（キャッシュ付き）
+// 現在のユーザー情報を取得
 async function getCurrentUser() {
-    // キャッシュ確認
-    let userInfo = getFromSessionCache(SESSION_STORAGE.USER_INFO, SESSION_STORAGE.USER_EXPIRES);
-    if (userInfo) {
-        return userInfo;
-    }
-    
-    // キャッシュなし：APIから取得
     try {
-        const response = await apiRequest('/api/liff/me');
-        userInfo = await response.json();
+        showDebugLog('getCurrentUser開始', 'info');
         
-        if (userInfo) {
-            saveToSessionCache(SESSION_STORAGE.USER_INFO, SESSION_STORAGE.USER_EXPIRES, userInfo);
+        const uid = await ensureLineUserId();
+        if (!uid) {
+            showDebugLog('LINE認証が必要です', 'warn');
+            return null; // ログイン遷移中
         }
         
-        return userInfo;
+        // 環境別プロフィール取得
+        let profile = null;
+        if (CONFIG.isDev) {
+            // 開発環境：疑似プロフィール
+            profile = {
+                userId: uid,
+                displayName: '開発用ユーザー',
+                pictureUrl: null
+            };
+            showDebugLog(`開発環境プロフィール: ${profile.displayName}`, 'info');
+        } else {
+            // VPS環境：LIFF SDKから取得
+            showDebugLog('LIFFプロフィール再取得開始', 'info');
+            profile = await liff.getProfile();
+            showDebugLog(`LIFFプロフィール取得成功 - userId: ${profile.userId}, name: ${profile.displayName}`, 'success');
+        }
+        
+        // APIサーバーからメンバー情報を取得
+        showDebugLog('APIサーバーからメンバー情報取得開始', 'info');
+        const response = await apiRequest('/api/liff/me');
+        const userData = await response.json();
+        
+        showDebugLog(`メンバー情報取得完了 - member_id: ${userData.member_id || 'N/A'}`, 'success');
+        
+        return {
+            ...userData,
+            lineProfile: profile
+        };
+        
     } catch (error) {
-        console.error('ユーザー情報取得エラー:', error);
+        showDebugLog(`getCurrentUser失敗: ${error.message}`, 'error');
         return null;
     }
 }
@@ -283,14 +424,6 @@ function initCollapsible() {
             const content = this.nextElementSibling;
             const isActive = this.classList.contains('active');
             
-            // 他の折りたたみを閉じる（必要に応じて）
-            // document.querySelectorAll('.collapsible-header.active').forEach(h => {
-            //     if (h !== this) {
-            //         h.classList.remove('active');
-            //         h.nextElementSibling.classList.remove('show');
-            //     }
-            // });
-            
             if (isActive) {
                 this.classList.remove('active');
                 content.classList.remove('show');
@@ -308,7 +441,7 @@ function getUrlParameter(name) {
     return urlParams.get(name);
 }
 
-// デバッグ用ユーティリティ
+// 開発環境用デバッグユーティリティ
 if (CONFIG.isDev) {
     window.debugLiff = {
         // 現在のユーザー情報確認
@@ -322,34 +455,23 @@ if (CONFIG.isDev) {
             }
         },
         
-        // イベント情報確認
-        async getEvent(eventId) {
-            try {
-                const response = await apiRequest(`/api/liff/events/${eventId}`);
-                const event = await response.json();
-                console.log('Event:', event);
-                return event;
-            } catch (error) {
-                console.error('Error:', error);
-            }
-        },
-        
         // 設定確認
         getConfig() {
             console.log('Config:', CONFIG);
             return CONFIG;
         },
         
-        // キャッシュ関連デバッグ
-        clearCache() {
-            clearAuthCache();
-            console.log('🗑️ キャッシュをクリアしました');
+        // 開発用ユーザーID変更
+        setDevUserId(userId) {
+            localStorage.setItem('dev-line-user-id', userId);
+            console.log(`🔧 開発用UserIDを変更: ${userId}`);
         },
         
-        showCache() {
-            console.log('💾 現在のキャッシュ状況:');
-            console.log('USER_INFO:', getFromSessionCache(SESSION_STORAGE.USER_INFO, SESSION_STORAGE.USER_EXPIRES));
-            console.log('LIFF_PROFILE:', getFromSessionCache(SESSION_STORAGE.LIFF_PROFILE, SESSION_STORAGE.PROFILE_EXPIRES));
+        // 現在の開発用ユーザーID確認
+        getDevUserId() {
+            const userId = localStorage.getItem('dev-line-user-id') || CONFIG.DEV_USER_ID;
+            console.log(`📱 現在の開発用UserID: ${userId}`);
+            return userId;
         }
     };
     
@@ -361,10 +483,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // 折りたたみ機能初期化
     initCollapsible();
     
-    // 開発環境でのデバッグ情報表示
+    // 環境情報表示
     if (CONFIG.isDev) {
         console.log('🚀 LIFF App loaded in development mode');
         console.log('📱 Test User ID:', CONFIG.DEV_USER_ID);
+        console.log('🌐 API Base:', CONFIG.API_BASE);
     }
 });
 

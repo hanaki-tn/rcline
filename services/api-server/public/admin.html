@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RC公式LINE 管理画面</title>
+    <style>
+        /* リセット・基本スタイル */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: #f5f7fa;
+            color: #333;
+            line-height: 1.6;
+        }
+        
+        /* コンテナ・レイアウト */
+        .container { 
+            max-width: 1400px; 
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        
+        .card { 
+            background: white; 
+            padding: 24px; 
+            margin: 20px 0; 
+            border-radius: 12px; 
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            transition: box-shadow 0.3s ease;
+        }
+        
+        .card:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+        }
+        
+        /* ログインフォーム */
+        .login-form { 
+            max-width: 400px; 
+            margin: 80px auto;
+        }
+        
+        /* フォーム要素 */
+        .form-group { 
+            margin-bottom: 20px;
+        }
+        
+        label { 
+            display: block; 
+            margin-bottom: 6px; 
+            font-weight: 600;
+            color: #555;
+            font-size: 14px;
+        }
+        
+        /* 入力フィールドの幅調整 */
+        input[type="text"], 
+        input[type="password"], 
+        select, 
+        textarea {
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+        
+        input[type="text"]:focus,
+        input[type="password"]:focus,
+        select:focus,
+        textarea:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 3px rgba(0,123,255,0.1);
+        }
+        
+        /* 用途に応じた入力幅 */
+        .input-full { width: 100%; }
+        .input-large { width: 500px; max-width: 100%; }
+        .input-medium { width: 300px; max-width: 100%; }
+        .input-small { width: 200px; max-width: 100%; }
+        .input-tiny { width: 120px; max-width: 100%; }
+        
+        textarea {
+            width: 100%;
+            resize: vertical;
+            min-height: 80px;
+        }
+        
+        /* ボタン */
+        button {
+            background: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        
+        button:hover:not(:disabled) {
+            background: #0056b3;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,123,255,0.2);
+        }
+        
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        button.secondary {
+            background: #6c757d;
+        }
+        
+        button.secondary:hover:not(:disabled) {
+            background: #545b62;
+        }
+        
+        button.danger {
+            background: #dc3545;
+        }
+        
+        button.danger:hover:not(:disabled) {
+            background: #c82333;
+        }
+        
+        button.success {
+            background: #28a745;
+        }
+        
+        button.success:hover:not(:disabled) {
+            background: #218838;
+        }
+        
+        /* メッセージ */
+        .success { color: #28a745; }
+        .error { color: #dc3545; }
+        .info { color: #17a2b8; }
+        .warning { color: #ffc107; }
+        
+        /* テーブル */
+        .table-container {
+            overflow-x: auto;
+            margin: 20px 0;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+        
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            color: #495057;
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+        }
+        
+        th.sortable:hover {
+            background-color: #e9ecef;
+        }
+        
+        th.sortable::after {
+            content: '↕';
+            position: absolute;
+            right: 8px;
+            opacity: 0.3;
+        }
+        
+        th.sort-asc::after {
+            content: '↑';
+            opacity: 1;
+        }
+        
+        th.sort-desc::after {
+            content: '↓';
+            opacity: 1;
+        }
+        
+        tbody tr:hover {
+            background-color: #f8f9fa;
+        }
+        
+        /* バッジ */
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .badge-member { background: #e3f2fd; color: #1976d2; }
+        .badge-staff { background: #fff3e0; color: #f57c00; }
+        .badge-linked { background: #e8f5e8; color: #2e7d32; }
+        .badge-unlinked { background: #ffebee; color: #d32f2f; }
+        
+        /* ステータス表示（LIFFと統一） */
+        .status-attend { color: #28a745; font-weight: 600; }
+        .status-absent { color: #dc3545; font-weight: 600; }
+        .status-pending { color: #6c757d; font-weight: 600; }
+        
+        /* ナビゲーション */
+        .nav {
+            margin: 20px 0;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        .nav button {
+            margin: 0;
+        }
+        
+        /* ハンバーガーメニュー（モバイル用） */
+        .hamburger {
+            display: none;
+            flex-direction: column;
+            cursor: pointer;
+            padding: 10px;
+            background: none;
+            border: 1px solid #ddd;
+        }
+        
+        .hamburger span {
+            width: 25px;
+            height: 3px;
+            background: #333;
+            margin: 3px 0;
+            transition: 0.3s;
+        }
+        
+        /* 検索・フィルター */
+        .search-box {
+            position: relative;
+            display: inline-block;
+            margin-bottom: 20px;
+        }
+        
+        .search-box input {
+            padding-left: 35px;
+            width: 300px;
+        }
+        
+        .search-box::before {
+            content: '🔍';
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+        
+        /* トースト通知 */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+        }
+        
+        .toast {
+            background: white;
+            padding: 16px 20px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            min-width: 300px;
+            animation: slideIn 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .toast.success {
+            border-left: 4px solid #28a745;
+        }
+        
+        .toast.error {
+            border-left: 4px solid #dc3545;
+        }
+        
+        .toast.info {
+            border-left: 4px solid #17a2b8;
+        }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        @keyframes fadeOut {
+            from {
+                opacity: 1;
+            }
+            to {
+                opacity: 0;
+            }
+        }
+        
+        /* ユーティリティクラス */
+        .hidden { display: none !important; }
+        .mt-3 { margin-top: 1rem; }
+        .mb-3 { margin-bottom: 1rem; }
+        .text-center { text-align: center; }
+        .d-flex { display: flex; }
+        .gap-2 { gap: 0.5rem; }
+        
+        /* レスポンシブ対応 */
+        @media (max-width: 768px) {
+            .container {
+                padding: 0 10px;
+            }
+            
+            .card {
+                padding: 16px;
+                margin: 10px 0;
+            }
+            
+            .nav {
+                flex-direction: column;
+                align-items: stretch;
+                display: none;
+                background: white;
+                position: absolute;
+                top: 60px;
+                left: 0;
+                right: 0;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+                z-index: 100;
+            }
+            
+            .nav.active {
+                display: flex;
+            }
+            
+            .nav button {
+                width: 100%;
+                text-align: left;
+                border-radius: 0;
+            }
+            
+            .hamburger {
+                display: flex;
+            }
+            
+            .input-large,
+            .input-medium,
+            .input-small {
+                width: 100%;
+            }
+            
+            table {
+                font-size: 12px;
+            }
+            
+            th, td {
+                padding: 8px;
+            }
+        }
+        
+        /* ヘッダー */
+        .header {
+            background: white;
+            padding: 16px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+            margin-bottom: 20px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            color: #333;
+        }
+        
+        /* 確認ダイアログ */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 10000;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        .modal.active {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .modal-content {
+            background: white;
+            padding: 24px;
+            border-radius: 12px;
+            max-width: 500px;
+            width: 90%;
+            animation: slideUp 0.3s ease;
+        }
+        
+        .modal-header {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+        
+        .modal-body {
+            margin-bottom: 24px;
+            color: #666;
+        }
+        
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        @keyframes slideUp {
+            from {
+                transform: translateY(20px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- トースト通知コンテナ -->
+    <div class="toast-container" id="toast-container"></div>
+    
+    <!-- 確認ダイアログ -->
+    <div class="modal" id="confirm-modal">
+        <div class="modal-content">
+            <div class="modal-header" id="modal-title">確認</div>
+            <div class="modal-body" id="modal-message">実行しますか？</div>
+            <div class="modal-footer">
+                <button onclick="closeModal(false)" class="secondary">キャンセル</button>
+                <button onclick="closeModal(true)" id="modal-confirm-btn">実行</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="container">
+        <!-- ログイン画面 -->
+        <div id="login-section" class="card">
+            <div class="login-form">
+                <h2>RC公式LINE 管理画面</h2>
+                <div class="form-group">
+                    <label for="username">ユーザー名:</label>
+                    <input type="text" id="username" class="input-full" value="hanaki">
+                </div>
+                <div class="form-group">
+                    <label for="password">パスワード:</label>
+                    <input type="password" id="password" class="input-full" value="vLJCUJ">
+                </div>
+                <button onclick="login()">ログイン</button>
+                <div id="login-message" class="error mt-3"></div>
+            </div>
+        </div>
+
+        <!-- メイン管理画面 -->
+        <div id="main-section" class="hidden">
+            <!-- ヘッダー -->
+            <div class="header">
+                <div class="header-content">
+                    <h1>RC公式LINE 管理画面</h1>
+                    <button class="hamburger" onclick="toggleNav()">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- ナビゲーション -->
+            <div class="nav" id="nav-menu">
+                <button onclick="showSection('event-new')">イベント作成</button>
+                <button onclick="showSection('event-list')">イベント一覧</button>
+                <button onclick="showSection('audience-new')">会員グループ作成</button>
+                <button onclick="showSection('audience-list')">会員グループ一覧</button>
+                <button onclick="showSection('members')">会員一覧</button>
+                <button onclick="confirmAction('ログアウトしますか？', logout)" class="danger">ログアウト</button>
+            </div>
+
+            <!-- 会員一覧セクション -->
+            <div id="members-section" class="card hidden">
+                <h3>会員一覧</h3>
+                
+                <!-- 検索・フィルター -->
+                <div class="d-flex gap-2" style="align-items: center; margin-bottom: 20px;">
+                    <div class="search-box">
+                        <input type="text" id="member-search" placeholder="名前で検索..." onkeyup="filterMembers()">
+                    </div>
+                    <select id="role-filter" onchange="filterMembers()" class="input-small">
+                        <option value="">全ての役割</option>
+                        <option value="member" selected>member のみ</option>
+                        <option value="staff">staff のみ</option>
+                    </select>
+                    <select id="line-filter" onchange="filterMembers()" class="input-small">
+                        <option value="">LINE状態</option>
+                        <option value="linked">紐付け済み</option>
+                        <option value="unlinked">未紐付け</option>
+                    </select>
+                </div>
+                
+                <div class="table-container">
+                    <table id="members-table">
+                        <thead>
+                            <tr>
+                                <th class="sortable" onclick="sortTable('members-table', 0, 'number')">ID</th>
+                                <th class="sortable" onclick="sortTable('members-table', 1, 'text')">名前</th>
+                                <th class="sortable" onclick="sortTable('members-table', 2, 'text')">役割</th>
+                                <th class="sortable" onclick="sortTable('members-table', 3, 'text')">LINE紐付け</th>
+                                <th class="sortable" onclick="sortTable('members-table', 4, 'text')">送信対象</th>
+                                <th class="sortable" onclick="sortTable('members-table', 5, 'number')">表示順</th>
+                            </tr>
+                        </thead>
+                        <tbody id="members-tbody"></tbody>
+                    </table>
+                </div>
+                <button onclick="loadMembers()">更新</button>
+            </div>
+
+            <!-- イベント作成セクション -->
+            <div id="event-new-section" class="card hidden">
+                <h3>イベント作成</h3>
+                <form id="event-form" enctype="multipart/form-data">
+                    <div class="form-group">
+                        <label for="event-title">タイトル（必須）:</label>
+                        <input type="text" id="event-title" name="title" class="input-large" required maxlength="100" placeholder="例: 定例会議">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="event-held-at">開催日時（必須）:</label>
+                        <input type="datetime-local" id="event-held-at" name="held_at" class="input-small" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="event-deadline-at">回答期限（必須）:</label>
+                        <input type="date" id="event-deadline-at" name="deadline_at" class="input-small" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="event-body">本文:</label>
+                        <textarea id="event-body" name="body" rows="3" maxlength="2000">出欠のご回答をお願いします。</textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="event-image">画像（JPG、必須、5MB以下）:</label>
+                        <input type="file" id="event-image" name="image" accept="image/jpeg" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="extra-text-enabled" name="extra_text_enabled">
+                            追加メモ欄を有効にする
+                        </label>
+                        <div id="extra-text-options" class="hidden" style="margin-left: 20px; margin-top: 10px;">
+                            <label for="extra-text-label">メモ欄のラベル:</label>
+                            <input type="text" id="extra-text-label" name="extra_text_label" class="input-small" value="備考" maxlength="50">
+                            <small style="color: #6c757d; display: block; margin-top: 5px;">※出席時は入力必須、欠席時は任意</small>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <h4>配信対象選択</h4>
+                        <div id="audience-selection">
+                            <div style="margin: 10px 0;">
+                                <label>
+                                    <input type="checkbox" id="select-all-members" onchange="toggleAllMembers()">
+                                    全員
+                                </label>
+                            </div>
+                            <div id="audience-checkboxes">読み込み中...</div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <h4>受信者プレビュー</h4>
+                        <div id="target-preview">配信対象を選択してください</div>
+                        <button type="button" onclick="updateTargetPreview()">プレビュー更新</button>
+                    </div>
+                    
+                    <button type="submit" id="event-create-button">イベント作成＆送信</button>
+                    <div id="event-create-message" class="mt-3"></div>
+                </form>
+            </div>
+
+            <!-- イベント一覧セクション -->
+            <div id="event-list-section" class="card hidden">
+                <h3>イベント一覧</h3>
+                
+                <!-- 検索・フィルター -->
+                <div class="d-flex gap-2" style="align-items: center; margin-bottom: 20px;">
+                    <div class="search-box">
+                        <input type="text" id="event-search" placeholder="タイトルで検索..." onkeyup="filterEvents()">
+                    </div>
+                    <input type="date" id="event-from" class="input-small" onchange="filterEvents()" placeholder="開始日">
+                    <input type="date" id="event-to" class="input-small" onchange="filterEvents()" placeholder="終了日">
+                    <button onclick="loadEvents()">読み込み</button>
+                </div>
+                
+                <div class="table-container">
+                    <table id="events-table">
+                        <thead>
+                            <tr>
+                                <th class="sortable" onclick="sortTable('events-table', 0, 'number')">ID</th>
+                                <th class="sortable" onclick="sortTable('events-table', 1, 'text')">タイトル</th>
+                                <th class="sortable" onclick="sortTable('events-table', 2, 'date')">開催日時</th>
+                                <th class="sortable" onclick="sortTable('events-table', 3, 'number')">対象者数</th>
+                                <th class="sortable" onclick="sortTable('events-table', 4, 'date')">作成日時</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="events-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 会員グループ作成セクション -->
+            <div id="audience-new-section" class="card hidden">
+                <h3>会員グループ作成</h3>
+                <div class="form-group">
+                    <label for="audience-name">グループ名:</label>
+                    <input type="text" id="audience-name" class="input-medium" placeholder="例: 理事会">
+                </div>
+                <div class="form-group">
+                    <label for="audience-sort">表示順:</label>
+                    <input type="number" id="audience-sort" class="input-tiny" placeholder="1">
+                </div>
+                <button onclick="createAudience()">作成</button>
+                <div id="audience-message" class="mt-3"></div>
+            </div>
+
+            <!-- 会員グループ一覧セクション -->
+            <div id="audience-list-section" class="card hidden">
+                <h3>会員グループ一覧</h3>
+                
+                <div class="table-container">
+                    <table id="audiences-table">
+                        <thead>
+                            <tr>
+                                <th class="sortable" onclick="sortTable('audiences-table', 0, 'number')">ID</th>
+                                <th class="sortable" onclick="sortTable('audiences-table', 1, 'text')">グループ名</th>
+                                <th class="sortable" onclick="sortTable('audiences-table', 2, 'number')">表示順</th>
+                                <th class="sortable" onclick="sortTable('audiences-table', 3, 'date')">作成日時</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="audiences-tbody"></tbody>
+                    </table>
+                </div>
+                <button onclick="loadAudiences()">更新</button>
+            </div>
+
+            <!-- audienceメンバー管理セクション -->
+            <div id="audience-members-section" class="card hidden">
+                <h3>会員グループメンバー管理</h3>
+                <div id="audience-info">
+                    <h4 id="current-audience-name">-</h4>
+                    <button onclick="showSection('audience-list')">← グループ一覧に戻る</button>
+                </div>
+                
+                <div class="form-group">
+                    <h4>現在の所属メンバー</h4>
+                    <div id="current-members">読み込み中...</div>
+                </div>
+                
+                <div class="form-group">
+                    <h4>メンバー選択</h4>
+                    <div class="search-box mb-3">
+                        <input type="text" id="member-select-search" placeholder="名前で絞り込み..." onkeyup="filterMemberSelection()">
+                    </div>
+                    <div style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; border-radius: 6px;">
+                        <div id="member-selection">読み込み中...</div>
+                    </div>
+                    <button onclick="saveAudienceMembers()" style="margin-top: 10px;">選択したメンバーを保存</button>
+                    <div id="member-save-message" class="mt-3"></div>
+                </div>
+            </div>
+
+            <!-- イベント詳細セクション -->
+            <div id="event-detail-section" class="card hidden">
+                <h3>イベント詳細</h3>
+                <div>
+                    <button onclick="showSection('event-list')">← イベント一覧に戻る</button>
+                </div>
+                
+                <div id="event-detail-content">読み込み中...</div>
+                
+                <!-- 基本情報 -->
+                <div class="form-group">
+                    <h4>基本情報</h4>
+                    <div id="event-basic-info">-</div>
+                </div>
+                
+                <!-- 送信要約 -->
+                <div class="form-group">
+                    <h4>送信要約</h4>
+                    <div id="event-push-summary">-</div>
+                </div>
+                
+                <!-- 画像表示 -->
+                <div class="form-group">
+                    <h4>画像</h4>
+                    <div id="event-image-display">-</div>
+                </div>
+                
+                <!-- 出欠状況 -->
+                <div class="form-group">
+                    <h4>出欠状況</h4>
+                    <div id="event-attendance-summary">-</div>
+                    <div style="max-height: 400px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; border-radius: 6px;">
+                        <div id="event-attendance-list">-</div>
+                    </div>
+                </div>
+                
+                <!-- CSV出力 -->
+                <div class="form-group">
+                    <h4>CSV出力</h4>
+                    <button onclick="downloadCSV('latest')" id="csv-latest-btn">最新状態をダウンロード</button>
+                    <button onclick="downloadCSV('history')" id="csv-history-btn">回答履歴をダウンロード</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="admin.js"></script>
+</body>
+</html>

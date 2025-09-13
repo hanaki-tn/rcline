@@ -25,7 +25,7 @@ RC公式LINEシステム - LINEボットを使った会員向け出欠確認シ�
 
 ### Docker Composeコマンド形式
 - **使用形式**: `docker compose`（スペース区切り）- Docker Compose v2
-- **旧形式**: `docker compose`（ハイフン区切り）- 非推奨
+- **旧形式**: `docker-compose`（ハイフン区切り）- 非推奨
 - **理由**: 2021年以降、Docker CLIに統合されたサブコマンド形式が標準
 
 ## 重要な作業フロー
@@ -51,7 +51,7 @@ docker compose -f docker compose.vps.yml up -d
 ## 主要な設計書
 
 ### 最重要
-- **[012_RC公式LINE設計書.md](012_RC公式LINE設計書.md)** - 全体設計書
+- **[012_RC公式LINE設計書.md](./012_RC公式LINE設計書.md)** - 全体設計書
 
 ### LINE連携
 - **[131_外部連携設計.md](../100_設計/131_外部連携設計.md)** - LINE API連携の詳細設計
@@ -59,9 +59,8 @@ docker compose -f docker compose.vps.yml up -d
 - **[133_Webhookハンドラ設計.md](../100_設計/133_Webhookハンドラ設計.md)** - Webhook処理設計
 
 ### 開発・運用
-- **[013_RC公式LINE開発環境構築ガイド.md](013_RC公式LINE開発環境構築ガイド.md)** - 環境構築手順
+- **[013_RC公式LINE開発環境構築ガイド.md](./013_RC公式LINE開発環境構築ガイド.md)** - 環境構築手順
 - **[301_運用メモ_api-serverロギング.md](../300_運用/301_運用メモ_api-serverロギング.md)** - ログ運用方法
-- **[016_開発の進め方.md](016_開発の進め方.md)** - 開発フロー
 
 ## 環境依存ファイル
 
