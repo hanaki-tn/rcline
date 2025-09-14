@@ -1317,7 +1317,6 @@ router.post('/messages/send', requireAuth, upload.single('image'), async (req, r
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     
-    const nowJST = () => new Date().toISOString().replace('Z', '+09:00');
     const now = nowJST();
     
     req.db.run(logSql, [

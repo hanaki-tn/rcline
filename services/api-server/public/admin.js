@@ -28,7 +28,7 @@ async function login() {
 
         if (response.ok) {
             currentUser = data.user;
-            messageDiv.innerHTML = '<span class="success">ログイン成功</span>';
+            messageDiv.innerHTML = '';
             document.getElementById('login-section').classList.add('hidden');
             document.getElementById('main-section').classList.remove('hidden');
             showToast('ログインしました', 'success');
@@ -68,6 +68,11 @@ function showSection(section) {
         if (el.id !== 'login-section' && el.id !== 'main-section') {
             el.classList.add('hidden');
         }
+    });
+    
+    // 全てのメッセージをクリア
+    document.querySelectorAll('[id$="-message"]').forEach(el => {
+        el.innerHTML = '';
     });
     
     // 指定セクションを表示
@@ -123,11 +128,24 @@ function showToast(message, type = 'info', duration = 3000) {
         warning: '⚠'
     }[type] || 'ℹ';
     
-    toast.innerHTML = `<span style="font-size: 20px;">${icon}</span> <span>${message}</span>`;
+    toast.innerHTML = `
+        <div class="toast-content">
+            <div class="toast-message">
+                <span style="font-size: 16px; margin-right: 8px;">${icon}</span>
+                ${message}
+            </div>
+            <button class="toast-close" onclick="this.parentElement.parentElement.remove()">×</button>
+        </div>
+    `;
+    
     container.appendChild(toast);
     
+    // アニメーション開始
+    setTimeout(() => toast.classList.add('show'), 10);
+    
+    // 自動削除
     setTimeout(() => {
-        toast.style.animation = 'fadeOut 0.3s ease';
+        toast.classList.remove('show');
         setTimeout(() => toast.remove(), 300);
     }, duration);
 }
@@ -799,7 +817,13 @@ async function loadAudiences() {
             <tr>
                 <td>${audience.id}</td>
                 <td>${audience.name}</td>
-                <td>${audience.sort_order || '-'}</td>
+                <td>
+                    <input type="number" 
+                           value="${audience.sort_order || ''}" 
+                           style="width: 60px; text-align: center;"
+                           onchange="updateAudienceSortOrder(${audience.id}, this.value)"
+                           placeholder="順番">
+                </td>
                 <td>${new Date(audience.created_at).toLocaleString('ja-JP')}</td>
                 <td>
                     <button onclick="manageAudienceMembers(${audience.id}, '${audience.name}')">メンバー管理</button>
@@ -837,10 +861,10 @@ async function createAudience() {
         const data = await response.json();
 
         if (response.ok) {
-            messageDiv.innerHTML = '<span class="success">作成完了</span>';
+            messageDiv.innerHTML = '';
+            showToast('会員グループを作成しました', 'success');
             document.getElementById('audience-name').value = '';
             document.getElementById('audience-sort').value = '';
-            showToast('グループを作成しました', 'success');
             loadAudiences();
         } else {
             messageDiv.innerHTML = `<span class="error">${data.message}</span>`;
@@ -867,6 +891,29 @@ async function deleteAudience(id) {
         }
     } catch (error) {
         showToast('エラーが発生しました', 'error');
+    }
+}
+
+async function updateAudienceSortOrder(audienceId, sortOrder) {
+    try {
+        const response = await fetch(`/api/admin/audiences/${audienceId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ sort_order: parseInt(sortOrder) || null })
+        });
+
+        if (response.ok) {
+            showToast('表示順を更新しました', 'success');
+        } else {
+            const data = await response.json();
+            showToast(`更新に失敗しました: ${data.message}`, 'error');
+            // エラー時は元の値に戻すため再読み込み
+            loadAudiences();
+        }
+    } catch (error) {
+        showToast('エラーが発生しました', 'error');
+        loadAudiences();
     }
 }
 
@@ -961,8 +1008,8 @@ async function saveAudienceMembers() {
         const data = await response.json();
         
         if (response.ok) {
-            messageDiv.innerHTML = `<div class="success">保存完了: ${data.count}名を割り当てました</div>`;
-            showToast('メンバーを保存しました', 'success');
+            messageDiv.innerHTML = '';
+            showToast(`保存完了: ${data.count}名を割り当てました`, 'success');
             loadAudienceMembers();
         } else {
             messageDiv.innerHTML = `<div class="error">保存失敗: ${data.message}</div>`;
@@ -1011,10 +1058,8 @@ async function loadMessageAudiences() {
         const data = await response.json();
         const select = document.getElementById('message-audience');
         
-        // 既存のオプションをクリア（最初のオプション以外）
-        while (select.children.length > 1) {
-            select.removeChild(select.lastChild);
-        }
+        // 既存のオプションをクリア
+        select.innerHTML = '';
         
         // audienceを追加
         data.audiences.forEach(audience => {
