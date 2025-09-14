@@ -90,6 +90,9 @@ function showSection(section) {
         case 'event-new':
             loadEventForm();
             break;
+        case 'message-send':
+            loadMessageSendSection();
+            break;
         case 'audience-list':
             loadAudiences();
             break;
@@ -572,7 +575,7 @@ async function loadEventDetail() {
         // 基本情報
         const basicInfoDiv = document.getElementById('event-basic-info');
         const heldAt = new Date(event.held_at).toLocaleString('ja-JP');
-        const deadlineAt = event.deadline_at ? new Date(event.deadline_at).toLocaleString('ja-JP') : '未設定';
+        const deadlineAt = event.deadline_at ? new Date(event.deadline_at).toLocaleDateString('ja-JP') : '未設定';
         basicInfoDiv.innerHTML = `
             <p><strong>タイトル:</strong> ${event.title}</p>
             <p><strong>開催日時:</strong> ${heldAt}</p>
@@ -987,3 +990,233 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
+
+// ================== メッセージ送信機能 ==================
+
+// メッセージ送信セクション初期化
+async function loadMessageSendSection() {
+    await loadMessageAudiences();
+    initMessageForm();
+}
+
+// audience一覧読み込み
+async function loadMessageAudiences() {
+    try {
+        const response = await fetch('/api/admin/messages/audiences', {
+            credentials: 'include'
+        });
+        
+        if (!response.ok) throw new Error('audience取得に失敗しました');
+        
+        const data = await response.json();
+        const select = document.getElementById('message-audience');
+        
+        // 既存のオプションをクリア（最初のオプション以外）
+        while (select.children.length > 1) {
+            select.removeChild(select.lastChild);
+        }
+        
+        // audienceを追加
+        data.audiences.forEach(audience => {
+            const option = document.createElement('option');
+            option.value = audience.id;
+            option.textContent = `${audience.name}（${audience.member_count}名）`;
+            select.appendChild(option);
+        });
+        
+        // デフォルト選択（sort_orderが最小のもの）
+        if (data.audiences.length > 0) {
+            select.value = data.audiences[0].id;
+        }
+        
+    } catch (error) {
+        console.error('audience読み込みエラー:', error);
+        showToast('audience一覧の取得に失敗しました', 'error');
+    }
+}
+
+// メッセージフォーム初期化
+function initMessageForm() {
+    const form = document.getElementById('message-form');
+    const textTab = document.getElementById('text-tab');
+    const imageTab = document.getElementById('image-tab');
+    const messageText = document.getElementById('message-text');
+    const messageImage = document.getElementById('message-image');
+    const uploadArea = document.querySelector('.file-upload-area');
+    const charRemaining = document.getElementById('char-remaining');
+    
+    // タブ切り替え
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const tabName = btn.dataset.tab;
+            switchMessageTab(tabName);
+        });
+    });
+    
+    // 文字数カウント
+    messageText.addEventListener('input', () => {
+        const remaining = 500 - messageText.value.length;
+        charRemaining.textContent = remaining;
+        
+        const charCount = document.querySelector('.char-count');
+        charCount.className = 'char-count';
+        if (remaining < 50) charCount.classList.add('warning');
+        if (remaining < 0) charCount.classList.add('danger');
+    });
+    
+    // 画像アップロード
+    messageImage.addEventListener('change', handleImageUpload);
+    
+    // ドラッグ&ドロップ
+    uploadArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadArea.classList.add('dragover');
+    });
+    
+    uploadArea.addEventListener('dragleave', () => {
+        uploadArea.classList.remove('dragover');
+    });
+    
+    uploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+        
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            messageImage.files = files;
+            handleImageUpload();
+        }
+    });
+    
+    // フォーム送信
+    form.onsubmit = async function(e) {
+        e.preventDefault();
+        await sendMessage();
+    };
+}
+
+// タブ切り替え
+function switchMessageTab(tabName) {
+    // タブボタンの状態更新
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+    
+    // タブコンテンツの表示切り替え
+    document.querySelectorAll('.tab-content').forEach(content => {
+        content.classList.remove('active');
+    });
+    document.getElementById(`${tabName}-tab`).classList.add('active');
+}
+
+// 画像アップロード処理
+function handleImageUpload() {
+    const fileInput = document.getElementById('message-image');
+    const preview = document.getElementById('image-preview');
+    const previewImg = document.getElementById('preview-img');
+    const imageInfo = document.getElementById('image-info');
+    
+    const file = fileInput.files[0];
+    if (!file) {
+        preview.classList.add('hidden');
+        return;
+    }
+    
+    // ファイルサイズチェック（5MB）
+    if (file.size > 5 * 1024 * 1024) {
+        showToast('ファイルサイズが5MBを超えています', 'error');
+        fileInput.value = '';
+        preview.classList.add('hidden');
+        return;
+    }
+    
+    // プレビュー表示
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        previewImg.src = e.target.result;
+        imageInfo.textContent = `${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
+        preview.classList.remove('hidden');
+    };
+    reader.readAsDataURL(file);
+}
+
+// メッセージ送信
+async function sendMessage() {
+    const form = document.getElementById('message-form');
+    const audienceSelect = document.getElementById('message-audience');
+    const includeSender = document.getElementById('include-sender').checked;
+    const activeTab = document.querySelector('.tab-btn.active').dataset.tab;
+    const messageText = document.getElementById('message-text');
+    const messageImage = document.getElementById('message-image');
+    
+    // バリデーション
+    if (!audienceSelect.value) {
+        showToast('送信先を選択してください', 'error');
+        return;
+    }
+    
+    if (activeTab === 'text' && !messageText.value.trim()) {
+        showToast('メッセージを入力してください', 'error');
+        return;
+    }
+    
+    if (activeTab === 'image' && !messageImage.files[0]) {
+        showToast('画像を選択してください', 'error');
+        return;
+    }
+    
+    // 送信確認
+    const audienceName = audienceSelect.selectedOptions[0].textContent;
+    const confirmMessage = `${audienceName}に送信します。よろしいですか？`;
+    
+    confirmAction(confirmMessage, async () => {
+        const formData = new FormData();
+        formData.append('type', activeTab);
+        formData.append('audience_id', audienceSelect.value);
+        formData.append('include_sender', includeSender);
+        
+        if (activeTab === 'text') {
+            formData.append('message_text', messageText.value.trim());
+        } else {
+            formData.append('image', messageImage.files[0]);
+        }
+        
+        try {
+            const submitBtn = document.getElementById('send-message-btn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = '送信中...';
+            
+            const response = await fetch('/api/admin/messages/send', {
+                method: 'POST',
+                credentials: 'include',
+                body: formData
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                const successMsg = result.fail_count > 0 
+                    ? `送信完了（成功: ${result.success_count}名、失敗: ${result.fail_count}名）`
+                    : `送信完了（${result.success_count}名）`;
+                showToast(successMsg, 'success');
+                
+                // フォームリセット
+                form.reset();
+                document.getElementById('image-preview').classList.add('hidden');
+                document.getElementById('char-remaining').textContent = '500';
+                switchMessageTab('image');
+            } else {
+                showToast(result.error || '送信に失敗しました', 'error');
+            }
+            
+        } catch (error) {
+            console.error('送信エラー:', error);
+            showToast('通信エラーが発生しました', 'error');
+        } finally {
+            const submitBtn = document.getElementById('send-message-btn');
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = `送信 <span id="test-mode-badge" style="background: orange; color: white; padding: 2px 6px; border-radius: 3px; font-size: 10px; margin-left: 5px; display: none;">🧪テストモード</span>`;
+        }
+    });
+}

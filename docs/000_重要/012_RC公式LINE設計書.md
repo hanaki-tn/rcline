@@ -344,11 +344,12 @@ docker compose exec redis redis-cli KEYS "*"
 
 ### 1.2 共通仕様
 
-* 認証：`admin_users`によるログイン必須（Cookieセッション＋CSRF）
+* 認証：`admin_users`によるログイン必須（Cookieセッション）
 * 権限：**admin のみ**
-* 表示時刻：**JST（UTC+9）**、`YYYY/MM/DD HH:mm`
+* 表示時刻：**JST（UTC+9）**、`YYYY/MM/DD HH:mm`（回答期限は日付のみ）
 * 名簿順：`members.display_order` 昇順（未設定は末尾）
-* 検索：初期は無し（将来必要なら追加）
+* イベント一覧順：`events.id` 降順（最新が上）
+* 検索：会員一覧・会員グループ管理では削除（シンプル化のため）
 
 ---
 
@@ -392,17 +393,20 @@ docker compose exec redis redis-cli KEYS "*"
 
 3. 配信先選択
 
-* **全員／理事会／各委員会**のチェック（複数可）
+* **理事会／各委員会**のチェック（複数可）
+* ~~全員~~（削除済み：シンプル化のため）
 * 候補は`members.role='member'`のみ（staff除外）
 
 4. 受信者プレビュー
 
 * 候補会員を名簿順で一覧表示（**全員チェックON**）
 * 個別にチェックOFFで除外
+* ~~プレビュー更新ボタン~~（削除済み：自動更新）
 * 確定した `member_ids` を保存
 
 5. 登録＆送信
 
+* 確認ダイアログ：「公式LINEへ送信しますか？」
 * ボタン押下で下記処理
 
   1. `events` 作成（メタ保存）
@@ -427,22 +431,23 @@ docker compose exec redis redis-cli KEYS "*"
 
 * 表示：
 
-  * 基本：`title` / `held_at` / `body`
+  * 基本：`title` / `held_at` / `deadline_at`（日付のみ） / `body`
   * **画像**：ページ内に**プレビューJPG**を表示（幅100%）。下に\*\*「全画面で開く」\*\*（**オリジナルJPG**のURL）
-    * 対象者：名簿順で現在値（出席／欠席／未回答）※イベントの回答（event_responses）は複数回出来るので、最新の情報を表示する。
-      * 会員名の前に公式LINE登録有無を表示：🟢（登録済み）／⚪（未登録）
-      * 出欠の右に代理回答マーカー：**✏️**（代理回答）
+  * 対象者：名簿順で現在値（出席／欠席／未回答）※イベントの回答（event_responses）は複数回出来るので、最新の情報を表示する。
+    * 会員名の前に公式LINE登録有無を表示：🟢（登録済み）／⚪（未登録）
+    * 出欠の右に代理回答マーカー：**✏️**（代理回答）
   * **送信要約**：`event_push_stats.success_count` / `fail_count` / `last_sent_at`
 * 代理回答機能（イベント作成者のみ）：
 
-  * 各会員の行に**［出席代理］［欠席代理］**ボタンを配置
-  * 代理回答確認ダイアログ：「〇〇さんの代理で出席/欠席を登録しますか？」
+  * 各会員の行に**［出席代理］［欠席代理］**ボタンを配置（白文字で視認性向上）
+  * `extra_text_enabled`が有効な場合、インラインでテキスト入力欄を表示
+  * 代理回答確認ダイアログ：「〇〇さんの代理で出席/欠席を登録しますか？」（extra_text含む）
   * 代理回答後、状況一覧に**「✏️」**マーカー表示
   * **権限制御**：`events.created_by_admin = session.adminUser.id`で判定
 * 出力：
 
-  * **CSV：最新状態**（member\_id, name, status, extra\_text, via）
-  * **CSV：履歴**（response\_id, responded\_at, member\_id, name, status, extra\_text, via）
+  * **CSV：最新状態**（member\_id, name, status, extra\_text, via）のみ
+  * ~~CSV：履歴~~（削除済み）
 * 再送：今回無し
 
 ---
@@ -452,15 +457,17 @@ docker compose exec redis redis-cli KEYS "*"
 * 一覧＋CRUD：`name`（一意）, `sort_order`
 * 所属割当：**会員リスト（role='member'のみ、名簿順）**にチェックON/OFF
 
-  * **ONだけ表示**トグル（確認用）
-  * **インクリメンタルフィルタ**（入力即時絞り込み）
+  * ~~グループ一覧に戻るボタン~~（削除済み：ナビゲーション統一）
+  * ~~インクリメンタルフィルタ~~（削除済み：シンプル化）
+  * **全選択チェックボックス**（ヘッダーに配置）
 
 ---
 
 ### 1.7 A-MEMBERS（参照のみ）
 
 * 表示：`id, name, display_order, role, line_user_id有無, is_target, line_display_name`
-* **role表示**: 'member' | 'staff'
+* **role表示**: 'member' | 'staff'（全役割表示）
+* ~~検索・フィルター~~（削除済み：シンプル化）
 * **同期UI無し**（同期はCLIのみ）
 
 ---

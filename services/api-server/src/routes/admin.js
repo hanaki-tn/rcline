@@ -1183,4 +1183,183 @@ router.post('/events/:id/proxy-response', requireAuth, [
   }
 });
 
+// ================== メッセージ送信機能 ==================
+
+// audience一覧取得（メッセージ送信用）
+router.get('/messages/audiences', requireAuth, (req, res) => {
+  const sql = `
+    SELECT 
+      a.id,
+      a.name,
+      a.sort_order,
+      COUNT(am.member_id) as member_count
+    FROM audiences a
+    LEFT JOIN audience_members am ON a.id = am.audience_id
+    LEFT JOIN members m ON am.member_id = m.id AND m.line_user_id IS NOT NULL
+    GROUP BY a.id, a.name, a.sort_order
+    ORDER BY a.sort_order ASC
+  `;
+  
+  req.db.all(sql, [], (err, audiences) => {
+    if (err) {
+      console.error('Audience一覧取得エラー:', err);
+      return res.status(500).json({
+        success: false,
+        error: 'データベースエラー'
+      });
+    }
+    
+    res.json({
+      audiences: audiences
+    });
+  });
+});
+
+// メッセージ送信
+router.post('/messages/send', requireAuth, upload.single('image'), async (req, res) => {
+  const { type, message_text, audience_id, include_sender } = req.body;
+  const image = req.file;
+  
+  // バリデーション
+  if (!type || !['text', 'image'].includes(type)) {
+    return res.status(400).json({
+      success: false,
+      error: 'メッセージタイプが無効です'
+    });
+  }
+  
+  if (!audience_id) {
+    return res.status(400).json({
+      success: false,
+      error: '送信先を選択してください'
+    });
+  }
+  
+  if (type === 'text' && (!message_text || message_text.trim().length === 0)) {
+    return res.status(400).json({
+      success: false,
+      error: 'メッセージを入力してください'
+    });
+  }
+  
+  if (type === 'image' && !image) {
+    return res.status(400).json({
+      success: false,
+      error: '画像を選択してください'
+    });
+  }
+
+  try {
+    // message-sender.jsをインポート
+    const { sendTextMessage, sendImageMessage, buildMessageTargets } = await import('../line/message-sender.js');
+    
+    // 送信対象リスト作成
+    const targetUserIds = await buildMessageTargets(
+      parseInt(audience_id),
+      include_sender === 'true',
+      req.session.adminUser.id,
+      req.db
+    );
+    
+    if (targetUserIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: '送信対象が見つかりません'
+      });
+    }
+
+    let imageUrl = null;
+    let imagePreviewUrl = null;
+    let imageSize = null;
+    let imagePreviewSize = null;
+    
+    // 画像処理（画像送信の場合）
+    if (type === 'image' && image) {
+      const fs = await import('fs');
+      const path = await import('path');
+      const sharp = await import('sharp');
+      
+      // ファイル保存
+      const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}`;
+      const originalPath = `/app/files/${fileName}_original.jpg`;
+      const previewPath = `/app/files/${fileName}_preview.jpg`;
+      
+      // オリジナル保存
+      await fs.promises.writeFile(originalPath, image.buffer);
+      imageSize = image.size;
+      imageUrl = `${process.env.FILES_PUBLIC_URL_BASE}/${fileName}_original.jpg`;
+      
+      // プレビュー生成（幅1080px）
+      await sharp.default(image.buffer)
+        .resize(1080, null, { withoutEnlargement: true })
+        .jpeg({ quality: 80 })
+        .toFile(previewPath);
+      
+      const previewStats = await fs.promises.stat(previewPath);
+      imagePreviewSize = previewStats.size;
+      imagePreviewUrl = `${process.env.FILES_PUBLIC_URL_BASE}/${fileName}_preview.jpg`;
+    }
+
+    // メッセージ送信実行
+    let sendResult;
+    if (type === 'text') {
+      sendResult = await sendTextMessage(targetUserIds, message_text.trim());
+    } else {
+      sendResult = await sendImageMessage(targetUserIds, imageUrl, imagePreviewUrl);
+    }
+
+    // 送信ログ記録
+    const logSql = `
+      INSERT INTO message_logs (
+        type, message_text, image_url, image_preview_url, image_size, image_preview_size,
+        audience_id, recipient_count, sent_by_admin, sent_at, success_count, fail_count,
+        created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+    
+    const nowJST = () => new Date().toISOString().replace('Z', '+09:00');
+    const now = nowJST();
+    
+    req.db.run(logSql, [
+      type,
+      type === 'text' ? message_text.trim() : null,
+      imageUrl,
+      imagePreviewUrl,
+      imageSize,
+      imagePreviewSize,
+      parseInt(audience_id),
+      targetUserIds.length,
+      req.session.adminUser.id,
+      now,
+      sendResult.success_count,
+      sendResult.fail_count,
+      now,
+      now
+    ], function(err) {
+      if (err) {
+        console.error('メッセージログ保存エラー:', err);
+        return res.status(500).json({
+          success: false,
+          error: 'ログ保存に失敗しました'
+        });
+      }
+      
+      res.json({
+        success: true,
+        message_log_id: this.lastID,
+        recipient_count: targetUserIds.length,
+        success_count: sendResult.success_count,
+        fail_count: sendResult.fail_count
+      });
+    });
+
+  } catch (error) {
+    console.error('メッセージ送信エラー:', error);
+    res.status(500).json({
+      success: false,
+      error: 'メッセージ送信に失敗しました'
+    });
+  }
+});
+
 export { router as adminRoutes, requireAuth };

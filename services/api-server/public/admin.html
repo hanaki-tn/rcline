@@ -464,6 +464,76 @@
                 opacity: 1;
             }
         }
+        
+        /* イベント詳細セクションの見出し強調 */
+        #event-detail-section h4 {
+            background: #f0f4f8;
+            padding: 8px 12px;
+            border-radius: 4px;
+            margin-bottom: 12px;
+            font-size: 15px;
+        }
+        
+        /* メッセージ送信タブ */
+        .tab-container {
+            margin: 20px 0;
+        }
+        
+        .tab-buttons {
+            display: flex;
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 20px;
+        }
+        
+        .tab-btn {
+            background: none;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+        
+        .tab-btn.active {
+            color: #007bff;
+            border-bottom-color: #007bff;
+            font-weight: 600;
+        }
+        
+        .tab-btn:hover {
+            background: #f8f9fa;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .file-upload-area {
+            transition: background-color 0.3s ease;
+        }
+        
+        .file-upload-area.dragover {
+            background-color: #e3f2fd;
+            border-color: #007bff;
+        }
+        
+        .char-count {
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .char-count.warning {
+            color: #ff9800;
+        }
+        
+        .char-count.danger {
+            color: #f44336;
+        }
     </style>
 </head>
 <body>
@@ -518,10 +588,70 @@
             <div class="nav" id="nav-menu">
                 <button onclick="showSection('event-new')">イベント作成</button>
                 <button onclick="showSection('event-list')">イベント一覧</button>
+                <button onclick="showSection('message-send')">メッセージ送信</button>
                 <button onclick="showSection('audience-new')">会員グループ作成</button>
                 <button onclick="showSection('audience-list')">会員グループ一覧</button>
                 <button onclick="showSection('members')">会員一覧</button>
                 <button onclick="confirmAction('ログアウトしますか？', logout)" class="danger">ログアウト</button>
+            </div>
+
+            <!-- メッセージ送信セクション -->
+            <div id="message-send-section" class="card hidden">
+                <h3>メッセージ送信</h3>
+                
+                <form id="message-form">
+                    <!-- 送信先選択 -->
+                    <div class="form-group">
+                        <label for="message-audience">送信先</label>
+                        <select id="message-audience" required>
+                            <option value="">送信先を選択してください...</option>
+                        </select>
+                        <label style="margin-top: 10px;">
+                            <input type="checkbox" id="include-sender" checked>
+                            送信者にも送信（推奨）
+                        </label>
+                    </div>
+                    
+                    <!-- タブ切り替え -->
+                    <div class="form-group">
+                        <div class="tab-container">
+                            <div class="tab-buttons">
+                                <button type="button" class="tab-btn" data-tab="text">テキスト</button>
+                                <button type="button" class="tab-btn active" data-tab="image">画像</button>
+                            </div>
+                            
+                            <!-- テキストタブ -->
+                            <div id="text-tab" class="tab-content">
+                                <textarea id="message-text" placeholder="メッセージを入力..." rows="5" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;"></textarea>
+                                <div class="char-count" style="text-align: right; font-size: 12px; color: #666; margin-top: 5px;">
+                                    残り文字数: <span id="char-remaining">500</span>/500
+                                </div>
+                            </div>
+                            
+                            <!-- 画像タブ -->
+                            <div id="image-tab" class="tab-content active">
+                                <div class="file-upload-area" style="border: 2px dashed #ddd; padding: 40px; text-align: center; border-radius: 6px;">
+                                    <input type="file" id="message-image" accept="image/jpeg,image/jpg,image/png" style="display: none;">
+                                    <div class="upload-placeholder">
+                                        <p>画像をドラッグ&ドロップ または <button type="button" onclick="document.getElementById('message-image').click()" style="background: none; border: none; color: #007bff; text-decoration: underline; cursor: pointer;">ファイル選択</button></p>
+                                        <p style="font-size: 12px; color: #666;">JPG, JPEG, PNG / 最大5MB</p>
+                                    </div>
+                                    <div id="image-preview" class="hidden" style="margin-top: 20px;">
+                                        <img id="preview-img" style="max-width: 100%; max-height: 300px; border-radius: 6px;">
+                                        <p id="image-info" style="font-size: 12px; color: #666; margin-top: 10px;"></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <button type="submit" id="send-message-btn" class="primary">
+                            送信
+                            <span id="test-mode-badge" style="background: orange; color: white; padding: 2px 6px; border-radius: 3px; font-size: 10px; margin-left: 5px; display: none;">🧪テストモード</span>
+                        </button>
+                    </div>
+                </form>
             </div>
 
             <!-- 会員一覧セクション -->
