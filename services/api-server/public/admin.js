@@ -351,15 +351,34 @@ async function loadAudiencesForEvents() {
         const data = await response.json();
         audiencesData = data.items;
         
-        const checkboxDiv = document.getElementById('audience-checkboxes');
-        checkboxDiv.innerHTML = audiencesData.map(audience => `
-            <div style="margin: 5px 0;">
-                <label>
-                    <input type="checkbox" name="audience-checkbox" value="${audience.id}" onchange="updateTargetPreview()">
-                    ${audience.name}
-                </label>
-            </div>
-        `).join('');
+        const select = document.getElementById('event-audience');
+        // 既存のオプションをクリア
+        select.innerHTML = '';
+        
+        // audienceを追加
+        audiencesData.forEach(audience => {
+            const option = document.createElement('option');
+            option.value = audience.id;
+            
+            // メンバー数を取得して表示
+            fetch(`/api/admin/audiences/${audience.id}/members`, {
+                credentials: 'include'
+            }).then(response => response.json())
+              .then(memberData => {
+                  const memberCount = memberData.items.length;
+                  option.textContent = `${audience.name}（${memberCount}名）`;
+              }).catch(() => {
+                  option.textContent = audience.name;
+              });
+            
+            select.appendChild(option);
+        });
+        
+        // 最初のオプションをデフォルトで選択
+        if (audiencesData.length > 0) {
+            select.value = audiencesData[0].id;
+            updateTargetPreview();
+        }
     } catch (error) {
         console.error('Audiences読み込みエラー:', error);
     }
@@ -421,32 +440,37 @@ async function createEvent() {
     if (selectAll.checked) {
         targetMemberIds = allMembers.map(m => m.id);
     } else {
-        const checkedAudiences = document.querySelectorAll('input[name="audience-checkbox"]:checked');
-        const selectedAudienceIds = Array.from(checkedAudiences).map(cb => parseInt(cb.value));
+        const eventAudienceSelect = document.getElementById('event-audience');
         
-        if (selectedAudienceIds.length === 0) {
+        if (!eventAudienceSelect.value) {
             showToast('配信対象を選択してください', 'error');
             return;
         }
         
         // audienceメンバー取得
-        const targetMemberIdsSet = new Set();
-        for (const audienceId of selectedAudienceIds) {
-            try {
-                const response = await fetch(`/api/admin/audiences/${audienceId}/members`, {
-                    credentials: 'include'
-                });
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    data.items.forEach(member => targetMemberIdsSet.add(member.member_id));
-                }
-            } catch (error) {
-                console.error('Audience members取得エラー:', error);
+        const selectedAudienceId = parseInt(eventAudienceSelect.value);
+        try {
+            const response = await fetch(`/api/admin/audiences/${selectedAudienceId}/members`, {
+                credentials: 'include'
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                targetMemberIds = data.items.map(member => member.member_id);
+            } else {
+                showToast('配信対象メンバーの取得に失敗しました', 'error');
+                return;
             }
+        } catch (error) {
+            console.error('Audience members取得エラー:', error);
+            showToast('配信対象メンバーの取得に失敗しました', 'error');
+            return;
         }
-        
-        targetMemberIds = Array.from(targetMemberIdsSet);
+    }
+    
+    // 送信者を対象に追加（メッセージ送信機能と統一）
+    if (currentUser && currentUser.member_id && !targetMemberIds.includes(currentUser.member_id)) {
+        targetMemberIds.push(currentUser.member_id);
     }
     
     if (targetMemberIds.length === 0) {
@@ -511,11 +535,15 @@ async function createEvent() {
 
 function toggleAllMembers() {
     const selectAll = document.getElementById('select-all-members');
-    const audienceCheckboxes = document.querySelectorAll('input[name="audience-checkbox"]');
+    const eventAudienceSelect = document.getElementById('event-audience');
     
-    audienceCheckboxes.forEach(checkbox => {
-        checkbox.checked = selectAll.checked;
-    });
+    if (selectAll.checked) {
+        // 全員選択時はドロップダウンを無効化
+        eventAudienceSelect.disabled = true;
+    } else {
+        // 全員選択解除時はドロップダウンを有効化
+        eventAudienceSelect.disabled = false;
+    }
     
     updateTargetPreview();
 }
@@ -523,44 +551,41 @@ function toggleAllMembers() {
 async function updateTargetPreview() {
     const previewDiv = document.getElementById('target-preview');
     const selectAll = document.getElementById('select-all-members');
-    const checkedAudiences = document.querySelectorAll('input[name="audience-checkbox"]:checked');
+    const eventAudienceSelect = document.getElementById('event-audience');
     
-    if (selectAll.checked) {
+    if (selectAll && selectAll.checked) {
         previewDiv.innerHTML = `<p><strong>全員: ${allMembers.length}名</strong></p>`;
         return;
     }
     
-    if (checkedAudiences.length === 0) {
+    if (!eventAudienceSelect || !eventAudienceSelect.value) {
         previewDiv.innerHTML = '<p>配信対象を選択してください</p>';
         return;
     }
     
     try {
-        const selectedAudienceIds = Array.from(checkedAudiences).map(cb => parseInt(cb.value));
-        let targetMemberIds = new Set();
-        
-        for (const audienceId of selectedAudienceIds) {
-            const response = await fetch(`/api/admin/audiences/${audienceId}/members`, {
-                credentials: 'include'
-            });
-            
-            if (response.ok) {
-                const data = await response.json();
-                data.items.forEach(member => targetMemberIds.add(member.member_id));
-            }
-        }
-        
-        const targetMembers = allMembers.filter(member => targetMemberIds.has(member.id));
-        targetMembers.sort((a, b) => (a.display_order || 999) - (b.display_order || 999));
-        
-        let html = `<p><strong>対象: ${targetMembers.length}名</strong></p>`;
-        html += '<div style="max-height: 150px; overflow-y: auto; border: 1px solid #ddd; padding: 5px; border-radius: 6px;">';
-        targetMembers.forEach(member => {
-            html += `<div>${member.name}</div>`;
+        const selectedAudienceId = parseInt(eventAudienceSelect.value);
+        const response = await fetch(`/api/admin/audiences/${selectedAudienceId}/members`, {
+            credentials: 'include'
         });
-        html += '</div>';
         
-        previewDiv.innerHTML = html;
+        if (response.ok) {
+            const data = await response.json();
+            const targetMemberIds = new Set(data.items.map(member => member.member_id));
+            const targetMembers = allMembers.filter(member => targetMemberIds.has(member.id));
+            targetMembers.sort((a, b) => (a.display_order || 999) - (b.display_order || 999));
+            
+            let html = `<p><strong>対象: ${targetMembers.length}名</strong></p>`;
+            html += '<div style="max-height: 150px; overflow-y: auto; border: 1px solid #ddd; padding: 5px; border-radius: 6px;">';
+            targetMembers.forEach(member => {
+                html += `<div>${member.name}</div>`;
+            });
+            html += '</div>';
+            
+            previewDiv.innerHTML = html;
+        } else {
+            previewDiv.innerHTML = '<div class="error">メンバー情報の取得に失敗しました</div>';
+        }
     } catch (error) {
         previewDiv.innerHTML = `<div class="error">プレビュー取得エラー: ${error.message}</div>`;
     }
