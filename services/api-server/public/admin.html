@@ -659,7 +659,7 @@
             <!-- ヘッダー -->
             <div class="header">
                 <div class="header-content">
-                    <h1>浦和北東RC 公式LINE 管理画面</h1>
+                    <h1>　浦和北東RC 公式LINE 管理画面</h1>
                     <button class="hamburger" onclick="toggleNav()">
                         <span></span>
                         <span></span>
@@ -673,8 +673,8 @@
                 <button onclick="showSection('message-send')">メッセージ送信</button>
                 <button onclick="showSection('event-new')">イベント作成</button>
                 <button onclick="showSection('event-list')">イベント一覧</button>
-                <button onclick="showSection('audience-new')" class="maintenance">会員グループ作成</button>
-                <button onclick="showSection('audience-list')" class="maintenance">会員グループ一覧</button>
+                <button onclick="showSection('audience-new')" class="maintenance">送信グループ作成</button>
+                <button onclick="showSection('audience-list')" class="maintenance">送信グループ一覧</button>
                 <button onclick="showSection('members')" class="maintenance">会員一覧</button>
                 <button onclick="confirmAction('ログアウトしますか？', logout)" class="logout">ログアウト</button>
             </div>
@@ -850,9 +850,9 @@
                 </div>
             </div>
 
-            <!-- 会員グループ作成セクション -->
+            <!-- 送信グループ作成セクション -->
             <div id="audience-new-section" class="card hidden">
-                <h3>会員グループ作成</h3>
+                <h3>送信グループ作成</h3>
                 <div class="form-group">
                     <label for="audience-name">グループ名:</label>
                     <input type="text" id="audience-name" class="input-medium" placeholder="例: 理事会">
@@ -865,9 +865,9 @@
                 <div id="audience-message" class="mt-3"></div>
             </div>
 
-            <!-- 会員グループ一覧セクション -->
+            <!-- 送信グループ一覧セクション -->
             <div id="audience-list-section" class="card hidden">
-                <h3>会員グループ一覧</h3>
+                <h3>送信グループ一覧</h3>
                 
                 <div class="table-container">
                     <table id="audiences-table">
@@ -888,7 +888,7 @@
 
             <!-- audienceメンバー管理セクション -->
             <div id="audience-members-section" class="card hidden">
-                <h3>会員グループメンバー管理</h3>
+                <h3>送信グループメンバー管理</h3>
                 <div id="audience-info">
                     <h4 id="current-audience-name">-</h4>
                 </div>

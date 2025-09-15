@@ -469,12 +469,7 @@ async function createEvent() {
             return;
         }
     }
-    
-    // 送信者を対象に追加（メッセージ送信機能と統一）
-    if (currentUser && currentUser.member_id && !targetMemberIds.includes(currentUser.member_id)) {
-        targetMemberIds.push(currentUser.member_id);
-    }
-    
+
     if (targetMemberIds.length === 0) {
         showToast('対象メンバーが見つかりません', 'error');
         return;
@@ -889,7 +884,7 @@ async function createAudience() {
 
         if (response.ok) {
             messageDiv.innerHTML = '';
-            showToast('会員グループを作成しました', 'success');
+            showToast('送信グループを作成しました', 'success');
             document.getElementById('audience-name').value = '';
             document.getElementById('audience-sort').value = '';
             loadAudiences();

@@ -176,7 +176,7 @@ router.get('/events', requireLineUser, async (req, res) => {
       LEFT JOIN event_targets et ON e.id = et.event_id
       LEFT JOIN admin_users au ON e.created_by_admin = au.id
       WHERE et.member_id = ? OR au.member_id = ?
-      ORDER BY e.held_at ASC
+      ORDER BY e.held_at DESC
     `, [member.id, member.id, member.id], (err, rows) => {
       if (err) {
         return res.status(500).json({
