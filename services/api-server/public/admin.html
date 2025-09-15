@@ -637,16 +637,20 @@
         <div id="login-section" class="card">
             <div class="login-form">
                 <h2>RC公式LINE 管理画面</h2>
-                <div class="form-group">
-                    <label for="username">ユーザー名:</label>
-                    <input type="text" id="username" class="input-full" value="hanaki">
-                </div>
-                <div class="form-group">
-                    <label for="password">パスワード:</label>
-                    <input type="password" id="password" class="input-full" value="vLJCUJ">
-                </div>
-                <button onclick="login()">ログイン</button>
-                <div id="login-message" class="error mt-3"></div>
+                <form id="login-form" method="POST" action="/api/admin/login">
+                    <div class="form-group">
+                        <label for="username">ユーザー名:</label>
+                        <input type="text" id="username" name="username" class="input-full" 
+                               autocomplete="username" value="hanaki" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="password">パスワード:</label>
+                        <input type="password" id="password" name="password" class="input-full" 
+                               autocomplete="current-password" value="vLJCUJ" required>
+                    </div>
+                    <button type="submit">ログイン</button>
+                    <div id="login-message" class="error mt-3"></div>
+                </form>
             </div>
         </div>
 

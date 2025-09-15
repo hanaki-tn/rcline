@@ -29,6 +29,15 @@ async function login() {
         if (response.ok) {
             currentUser = data.user;
             messageDiv.innerHTML = '';
+            
+            // ブラウザにログイン成功を通知（パスワード保存のため）
+            const loginForm = document.getElementById('login-form');
+            if (loginForm) {
+                // フォーム送信成功をブラウザに明示
+                const successEvent = new Event('submit', { cancelable: false });
+                loginForm.dispatchEvent(successEvent);
+            }
+            
             document.getElementById('login-section').classList.add('hidden');
             document.getElementById('main-section').classList.remove('hidden');
             showToast('ログインしました', 'success');
@@ -1290,3 +1299,17 @@ async function sendMessage() {
         }
     });
 }
+
+// ページ読み込み完了時にフォームのイベントリスナーを設定
+document.addEventListener('DOMContentLoaded', function() {
+    // ログインフォームの送信をハンドリング
+    const loginForm = document.getElementById('login-form');
+    if (loginForm) {
+        loginForm.addEventListener('submit', async function(e) {
+            e.preventDefault(); // デフォルトのフォーム送信を阻止
+            
+            // 既存のlogin()関数を呼び出し
+            await login();
+        });
+    }
+});
