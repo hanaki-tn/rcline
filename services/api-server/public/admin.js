@@ -30,13 +30,6 @@ async function login() {
             currentUser = data.user;
             messageDiv.innerHTML = '';
             
-            // ブラウザにログイン成功を通知（パスワード保存のため）
-            const loginForm = document.getElementById('login-form');
-            if (loginForm) {
-                // フォーム送信成功をブラウザに明示
-                const successEvent = new Event('submit', { cancelable: false });
-                loginForm.dispatchEvent(successEvent);
-            }
             
             document.getElementById('login-section').classList.add('hidden');
             document.getElementById('main-section').classList.remove('hidden');
