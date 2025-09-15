@@ -1,6 +1,6 @@
 // グローバル変数
 let currentUser = null;
-let currentSection = 'event-list';
+let currentSection = 'message-send';
 let currentAudienceId = null;
 let currentAudienceName = null;
 let currentEventId = null;
@@ -32,7 +32,7 @@ async function login() {
             document.getElementById('login-section').classList.add('hidden');
             document.getElementById('main-section').classList.remove('hidden');
             showToast('ログインしました', 'success');
-            showSection('event-list');
+            showSection('message-send');
         } else {
             messageDiv.innerHTML = `<span class="error">${data.message}</span>`;
             showToast('ログインに失敗しました', 'error');
@@ -920,7 +920,7 @@ async function updateAudienceSortOrder(audienceId, sortOrder) {
 function manageAudienceMembers(audienceId, audienceName) {
     currentAudienceId = audienceId;
     currentAudienceName = audienceName;
-    document.getElementById('current-audience-name').textContent = `${audienceName} (ID: ${audienceId})`;
+    document.getElementById('current-audience-name').textContent = audienceName;
     showSection('audience-members');
 }
 
@@ -1190,7 +1190,7 @@ function handleImageUpload() {
 async function sendMessage() {
     const form = document.getElementById('message-form');
     const audienceSelect = document.getElementById('message-audience');
-    const includeSender = document.getElementById('include-sender').checked;
+    const includeSender = true; // 常に送信者にも送信
     const activeTab = document.querySelector('.tab-btn.active').dataset.tab;
     const messageText = document.getElementById('message-text');
     const messageImage = document.getElementById('message-image');

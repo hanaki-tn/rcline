@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RC公式LINE 管理画面</title>
+    <title>　浦和北東RC 公式LINE 管理画面</title>
     <style>
         /* リセット・基本スタイル */
         * {
@@ -146,6 +146,16 @@
         
         button.maintenance:hover:not(:disabled) {
             background: #0f3a1c;
+        }
+        
+        button.logout {
+            background: #707070;
+            color: white;
+        }
+        
+        button.logout:hover:not(:disabled) {
+            background: #5a5a5a;
+            color: white;
         }
         
         /* メッセージ */
@@ -656,13 +666,13 @@
             
             <!-- ナビゲーション -->
             <div class="nav" id="nav-menu">
+                <button onclick="showSection('message-send')">メッセージ送信</button>
                 <button onclick="showSection('event-new')">イベント作成</button>
                 <button onclick="showSection('event-list')">イベント一覧</button>
-                <button onclick="showSection('message-send')">メッセージ送信</button>
                 <button onclick="showSection('audience-new')" class="maintenance">会員グループ作成</button>
                 <button onclick="showSection('audience-list')" class="maintenance">会員グループ一覧</button>
                 <button onclick="showSection('members')" class="maintenance">会員一覧</button>
-                <button onclick="confirmAction('ログアウトしますか？', logout)" class="danger">ログアウト</button>
+                <button onclick="confirmAction('ログアウトしますか？', logout)" class="logout">ログアウト</button>
             </div>
 
             <!-- メッセージ送信セクション -->
@@ -675,10 +685,9 @@
                         <label for="message-audience">送信先</label>
                         <select id="message-audience" required>
                         </select>
-                        <label style="margin-top: 10px;">
-                            <input type="checkbox" id="include-sender" checked>
-                            送信者にも送信（推奨）
-                        </label>
+                        <p style="margin-top: 10px; color: #6c757d; font-size: 14px;">
+                            ※このメッセージは、送信者にも送ります
+                        </p>
                     </div>
                     
                     <!-- タブ切り替え -->
