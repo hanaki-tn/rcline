@@ -240,10 +240,59 @@ async function apiRequest(endpoint, options = {}) {
     }
 }
 
+// セッションキャッシュの設定
+const SESSION_CACHE = {
+    USER_KEY: 'liff_user_info',
+    EXPIRE_KEY: 'liff_user_expire',
+    CACHE_DURATION: 60 * 60 * 1000 // 1時間
+};
+
+// キャッシュされたユーザー情報を取得
+function getCachedUser() {
+    try {
+        const cached = sessionStorage.getItem(SESSION_CACHE.USER_KEY);
+        const expire = sessionStorage.getItem(SESSION_CACHE.EXPIRE_KEY);
+
+        if (cached && expire) {
+            const expireTime = parseInt(expire);
+            if (Date.now() < expireTime) {
+                showDebugLog('セッションキャッシュからユーザー情報取得', 'success');
+                return JSON.parse(cached);
+            } else {
+                showDebugLog('セッションキャッシュ期限切れ', 'info');
+                sessionStorage.removeItem(SESSION_CACHE.USER_KEY);
+                sessionStorage.removeItem(SESSION_CACHE.EXPIRE_KEY);
+            }
+        }
+    } catch (error) {
+        showDebugLog(`キャッシュ読み込みエラー: ${error.message}`, 'error');
+    }
+    return null;
+}
+
+// ユーザー情報をキャッシュに保存
+function setCachedUser(userData) {
+    try {
+        sessionStorage.setItem(SESSION_CACHE.USER_KEY, JSON.stringify(userData));
+        sessionStorage.setItem(SESSION_CACHE.EXPIRE_KEY, (Date.now() + SESSION_CACHE.CACHE_DURATION).toString());
+        showDebugLog('ユーザー情報をセッションキャッシュに保存', 'success');
+    } catch (error) {
+        showDebugLog(`キャッシュ保存エラー: ${error.message}`, 'error');
+    }
+}
+
 // 現在のユーザー情報を取得
-async function getCurrentUser() {
+async function getCurrentUser(forceRefresh = false) {
     try {
         showDebugLog('getCurrentUser開始', 'info');
+
+        // キャッシュチェック（強制更新でない場合）
+        if (!forceRefresh) {
+            const cached = getCachedUser();
+            if (cached) {
+                return cached;
+            }
+        }
         
         const uid = await ensureLineUserId();
         if (!uid) {
@@ -274,11 +323,16 @@ async function getCurrentUser() {
         const userData = await response.json();
         
         showDebugLog(`メンバー情報取得完了 - member_id: ${userData.member_id || 'N/A'}`, 'success');
-        
-        return {
+
+        const userInfo = {
             ...userData,
             lineProfile: profile
         };
+
+        // キャッシュに保存
+        setCachedUser(userInfo);
+
+        return userInfo;
         
     } catch (error) {
         showDebugLog(`getCurrentUser失敗: ${error.message}`, 'error');
