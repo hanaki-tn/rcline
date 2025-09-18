@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>お知らせ - 浦和北東RC</title>
+    <link rel="stylesheet" href="common.css?v=20250117">
+
+    <!-- 新しいLIFF ID設定 -->
+    <script>
+        // notice.html用の新しいLIFF IDを設定
+        window.LIFF_ID_OVERRIDE = '2007866921-kw3W8dBv';
+    </script>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>お知らせ</h1>
+        </div>
+
+        <!-- ナビゲーション -->
+        <div class="nav" style="display: flex; justify-content: space-between; gap: 10px;">
+            <div style="width: 33%;"></div>
+            <div style="width: 33%;"></div>
+            <button onclick="closeLiff()" class="nav-button" style="width: 33%;">× 閉じる</button>
+        </div>
+
+        <!-- メインコンテンツ -->
+        <div id="main-content">
+            <div class="loading">
+                <div class="spinner"></div>
+                <div>認証中...</div>
+            </div>
+        </div>
+
+        <!-- ユーザー情報（開発用） -->
+        <div id="dev-info" class="d-none"></div>
+    </div>
+
+    <script>
+        // ページ初期化
+        async function initNoticePage() {
+            try {
+                // 認証モジュールで認証実行
+                const currentUser = await liffAuth.initialize({
+                    redirectToRegister: true,
+                    fromPage: 'notice'
+                });
+
+                if (!currentUser) {
+                    // 認証失敗またはリダイレクト中
+                    return;
+                }
+
+                // 認証成功後の処理
+                displayNoticeContent();
+
+            } catch (error) {
+                console.error('ページ初期化エラー:', error);
+                showError('main-content', 'ページの読み込みに失敗しました。');
+            }
+        }
+
+        // お知らせコンテンツ表示
+        function displayNoticeContent() {
+            const container = document.getElementById('main-content');
+
+            // TODO: 実際のNotionページURLを設定
+            const notionUrl = 'https://notion.so/your-page';
+
+            container.innerHTML = `
+                <div class="card">
+                    <div class="card-body">
+                        <h2>📢 お知らせページへ移動します</h2>
+                        <p>3秒後に自動的にお知らせページへ移動します。</p>
+                        <p>自動的に移動しない場合は、以下のボタンをクリックしてください。</p>
+
+                        <div class="mt-3">
+                            <a href="${notionUrl}" class="button button-primary" style="display: inline-block; text-decoration: none;">
+                                お知らせページを開く
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // 3秒後に自動リダイレクト
+            setTimeout(() => {
+                window.location.href = notionUrl;
+            }, 3000);
+        }
+
+        // LIFF画面を閉じる
+        function closeLiff() {
+            if (typeof liff !== 'undefined' && liff.isInClient()) {
+                liff.closeWindow();
+            } else {
+                window.close();
+                setTimeout(() => {
+                    window.location.href = 'about:blank';
+                }, 100);
+            }
+        }
+
+        // ページ読み込み時実行
+        document.addEventListener('DOMContentLoaded', initNoticePage);
+    </script>
+
+    <!-- LIFF SDK -->
+    <script
+        charset="utf-8"
+        src="https://static.line-scdn.net/liff/edge/2/sdk.js"
+        onload="console.log('LIFF SDK loaded'); window.liffSdkLoaded = true;"
+        onerror="console.error('LIFF SDK load FAILED'); window.liffSdkLoadError = true;">
+    </script>
+    <script src="common.js?v=20250117"></script>
+    <script src="auth.js?v=20250117"></script>
+</body>
+</html>

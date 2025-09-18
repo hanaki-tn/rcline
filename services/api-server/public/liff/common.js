@@ -8,7 +8,7 @@ const CONFIG = {
     API_BASE: window.location.hostname === 'localhost' ? '' : '/rcline',  // ローカルは相対パス、VPSは/rcline
     DEV_USER_ID: 'U45bc8ea2cb931b9ff43aa41559dbc7fc',
     isDev: window.location.hostname === 'localhost',  // 環境判定
-    LIFF_ID: '2007866921-LkR3yg4k',  // 出欠状況確認LIFF ID
+    LIFF_ID: window.LIFF_ID_OVERRIDE || '2007866921-LkR3yg4k',  // LIFF ID (上書き可能)
     showDebugUI: false  // 画面デバッグを出すか（?debug=1で上書き可能）
 };
 
