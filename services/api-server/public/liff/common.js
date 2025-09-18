@@ -141,7 +141,11 @@ async function ensureLineUserId() {
     
     try {
         showDebugLog('ensureLineUserId開始', 'info');
-        
+
+        // デバッグ用: inClientとisLoggedInの状態を記録
+        showDebugLog(`ensureLineUserId: inClient=${typeof liff?.isInClient==='function' ? liff.isInClient() : 'NA'}`, 'info');
+        showDebugLog(`ensureLineUserId: isLoggedIn=${typeof liff?.isLoggedIn==='function' ? liff.isLoggedIn() : 'NA'}`, 'info');
+
         if (!liffInitialized) {
             showDebugLog('LIFF未初期化 - initLiff実行', 'info');
             const ok = await initLiff();
@@ -150,10 +154,20 @@ async function ensureLineUserId() {
                 return null; // ログイン遷移
             }
         }
-        
-        if (!liff.isLoggedIn()) {
-            showDebugLog('LIFFログイン状態がfalse', 'warn');
+
+        // LINEアプリ内かどうかを判定
+        const inClient = typeof liff.isInClient === 'function' ? liff.isInClient() : false;
+
+        // 外部ブラウザで未ログインの場合のみnullを返す
+        // LINEアプリ内ではisLoggedIn()がfalseでもgetProfile()が可能
+        if (!inClient && !liff.isLoggedIn()) {
+            showDebugLog('外部ブラウザ未ログイン: login遷移を待機', 'warn');
             return null;
+        }
+
+        // LINEアプリ内でisLoggedIn()がfalseの場合のログ
+        if (inClient && !liff.isLoggedIn()) {
+            showDebugLog('LINEアプリ内: isLoggedIn=falseだがgetProfile()を続行', 'info');
         }
         
         if (cachedUserId) {
