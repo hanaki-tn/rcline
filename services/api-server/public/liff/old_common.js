@@ -68,6 +68,13 @@ async function initLiff() {
     
     try {
         showDebugLog(`LIFF初期化開始 - ID: ${CONFIG.LIFF_ID}`, 'info');
+
+        // ★ LIFF ID詳細ログ追加
+        showDebugLog(`CONFIG.LIFF_ID の値: "${CONFIG.LIFF_ID}" (type: ${typeof CONFIG.LIFF_ID})`, 'info');
+        showDebugLog(`LIFF_ID の長さ: ${CONFIG.LIFF_ID?.length || 'undefined'}`, 'info');
+        showDebugLog(`LIFF_ID が空文字か: ${CONFIG.LIFF_ID === ''}`, 'info');
+        showDebugLog(`LIFF_ID がnullか: ${CONFIG.LIFF_ID === null}`, 'info');
+        showDebugLog(`LIFF_ID がundefinedか: ${CONFIG.LIFF_ID === undefined}`, 'info');
         
         // LIFF SDKの読み込み診断
         showDebugLog(`window.liffSdkLoaded: ${window.liffSdkLoaded}`, 'info');
@@ -93,7 +100,10 @@ async function initLiff() {
         }
         
         showDebugLog('LIFF SDK読み込み確認OK', 'success');
-        
+
+        // ★ liff.init()実行前の最終確認
+        showDebugLog(`liff.init()実行直前 - 使用するLIFF_ID: "${CONFIG.LIFF_ID}"`, 'info');
+
         await liff.init({ liffId: CONFIG.LIFF_ID });
         showDebugLog('liff.init()完了', 'success');
         
@@ -125,6 +135,13 @@ async function initLiff() {
     } catch (error) {
         showDebugLog(`LIFF初期化失敗: ${error.message}`, 'error');
         showDebugLog(`エラー詳細: ${error.stack}`, 'error');
+
+        // ★ エラー時の追加診断情報
+        showDebugLog(`エラー名: ${error.name}`, 'error');
+        showDebugLog(`エラーの型: ${typeof error}`, 'error');
+        showDebugLog(`エラーコード: ${error.code || 'なし'}`, 'error');
+        showDebugLog(`liff.init()に渡したliffId: "${CONFIG.LIFF_ID}"`, 'error');
+
         throw error;
     }
 }
