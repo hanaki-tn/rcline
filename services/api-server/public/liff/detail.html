@@ -53,7 +53,12 @@
                 // ユーザー情報取得
                 currentUser = await getCurrentUser();
                 if (!currentUser) {
-                    showError('main-content', '認証に失敗しました。LINEから再度アクセスしてください。');
+                    // showError('main-content', '認証に失敗しました。LINEから再度アクセスしてください。'); // 元のメッセージ（復活用）
+                    document.getElementById('main-content').innerHTML = `
+                        <div class="message" style="text-align: center; padding: 40px 20px;">
+                            <h3>システムメンテナンス中</h3>
+                        </div>
+                    `;
                     return;
                 }
 
