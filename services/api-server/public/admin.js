@@ -434,40 +434,34 @@ async function createEvent() {
     }
     
     formData.append('extra_text_label', document.getElementById('extra-text-label').value);
-    
+
     // 対象メンバー取得
-    const selectAll = document.getElementById('select-all-members');
+    const eventAudienceSelect = document.getElementById('event-audience');
+
+    if (!eventAudienceSelect.value) {
+        showToast('配信対象を選択してください', 'error');
+        return;
+    }
+
+    // audienceメンバー取得
     let targetMemberIds = [];
-    
-    if (selectAll.checked) {
-        targetMemberIds = allMembers.map(m => m.id);
-    } else {
-        const eventAudienceSelect = document.getElementById('event-audience');
-        
-        if (!eventAudienceSelect.value) {
-            showToast('配信対象を選択してください', 'error');
-            return;
-        }
-        
-        // audienceメンバー取得
-        const selectedAudienceId = parseInt(eventAudienceSelect.value);
-        try {
-            const response = await fetch(`/api/admin/audiences/${selectedAudienceId}/members`, {
-                credentials: 'include'
-            });
-            
-            if (response.ok) {
-                const data = await response.json();
-                targetMemberIds = data.items.map(member => member.member_id);
-            } else {
-                showToast('配信対象メンバーの取得に失敗しました', 'error');
-                return;
-            }
-        } catch (error) {
-            console.error('Audience members取得エラー:', error);
+    const selectedAudienceId = parseInt(eventAudienceSelect.value);
+    try {
+        const response = await fetch(`/api/admin/audiences/${selectedAudienceId}/members`, {
+            credentials: 'include'
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            targetMemberIds = data.items.map(member => member.member_id);
+        } else {
             showToast('配信対象メンバーの取得に失敗しました', 'error');
             return;
         }
+    } catch (error) {
+        console.error('Audience members取得エラー:', error);
+        showToast('配信対象メンバーの取得に失敗しました', 'error');
+        return;
     }
 
     if (targetMemberIds.length === 0) {
@@ -530,31 +524,11 @@ async function createEvent() {
     }
 }
 
-function toggleAllMembers() {
-    const selectAll = document.getElementById('select-all-members');
-    const eventAudienceSelect = document.getElementById('event-audience');
-    
-    if (selectAll.checked) {
-        // 全員選択時はドロップダウンを無効化
-        eventAudienceSelect.disabled = true;
-    } else {
-        // 全員選択解除時はドロップダウンを有効化
-        eventAudienceSelect.disabled = false;
-    }
-    
-    updateTargetPreview();
-}
 
 async function updateTargetPreview() {
     const previewDiv = document.getElementById('target-preview');
-    const selectAll = document.getElementById('select-all-members');
     const eventAudienceSelect = document.getElementById('event-audience');
-    
-    if (selectAll && selectAll.checked) {
-        previewDiv.innerHTML = `<p><strong>全員: ${allMembers.length}名</strong></p>`;
-        return;
-    }
-    
+
     if (!eventAudienceSelect || !eventAudienceSelect.value) {
         previewDiv.innerHTML = '<p>配信対象を選択してください</p>';
         return;
@@ -1020,7 +994,7 @@ async function loadAudienceMembers() {
 function toggleAllMemberSelection() {
     const selectAll = document.getElementById('select-all-members');
     const checkboxes = document.querySelectorAll('input[name="member-checkbox"]');
-    
+
     checkboxes.forEach(checkbox => {
         checkbox.checked = selectAll.checked;
     });
