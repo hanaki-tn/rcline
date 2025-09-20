@@ -909,9 +909,23 @@ async function deleteAudience(id) {
             showToast('グループを削除しました', 'success');
             loadAudiences();
         } else {
-            showToast('削除に失敗しました', 'error');
+            // サーバーからの詳細エラー情報を表示
+            let errorMessage = '削除に失敗しました';
+            try {
+                const errorData = await response.json();
+                if (errorData.message) {
+                    errorMessage = errorData.message;
+                }
+                if (errorData.details) {
+                    console.error('削除エラー詳細:', errorData.details);
+                }
+            } catch (jsonError) {
+                console.error('エラーレスポンス解析失敗:', jsonError);
+            }
+            showToast(errorMessage, 'error');
         }
     } catch (error) {
+        console.error('削除リクエストエラー:', error);
         showToast('エラーが発生しました', 'error');
     }
 }

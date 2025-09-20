@@ -238,7 +238,7 @@ router.get('/members', requireAuth, (req, res) => {
 // audiences一覧 - フェーズ1-3
 router.get('/audiences', requireAuth, (req, res) => {
   req.db.all(
-    'SELECT id, name, sort_order, created_at, updated_at FROM audiences ORDER BY sort_order, name ASC',
+    'SELECT id, name, sort_order, created_at, updated_at FROM audiences WHERE del_flg = 0 ORDER BY sort_order, name ASC',
     (err, rows) => {
       if (err) {
         console.error('audiences一覧取得エラー:', err);
@@ -321,7 +321,7 @@ router.patch('/audiences/:id', requireAuth, [
     params.push(sort_order);
   }
 
-  sql += ' WHERE id = ?';
+  sql += ' WHERE id = ? AND del_flg = 0';
   params.push(id);
 
   req.db.run(sql, params, function(err) {
@@ -350,26 +350,30 @@ router.patch('/audiences/:id', requireAuth, [
   });
 });
 
-// audience削除
+// audience削除（ソフトデリート）
 router.delete('/audiences/:id', requireAuth, (req, res) => {
   const { id } = req.params;
-  
-  req.db.run('DELETE FROM audiences WHERE id = ?', [id], function(err) {
+
+  const now = nowJST();
+
+  req.db.run('UPDATE audiences SET del_flg = 1, deleted_at = ? WHERE id = ? AND del_flg = 0', [now, id], function(err) {
     if (err) {
       console.error('audience削除エラー:', err);
       return res.status(500).json({
         code: 'INTERNAL_ERROR',
-        message: 'データベースエラー'
+        message: 'データベースエラー',
+        details: err.message
       });
     }
 
     if (this.changes === 0) {
       return res.status(404).json({
         code: 'NOT_FOUND',
-        message: 'audienceが見つかりません'
+        message: 'audienceが見つかりません（存在しないか既に削除済みです）'
       });
     }
 
+    console.log(`audience ${id} を削除しました (影響行数: ${this.changes})`);
     res.status(204).send();
   });
 });

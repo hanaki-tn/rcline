@@ -300,7 +300,7 @@
                                             <div class="member-name" style="flex: 0 0 auto; font-weight: 500;">${lineStatusEmoji} ${escapeHtml(member.name)}</div>
                                             <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
                                                 <div>
-                                                    <span class="status-badge status-${member.status}">${statusText}${proxyMarker}</span>
+                                                    <span class="status-badge status-${member.status}">${statusText}</span>${proxyMarker}
                                                 </div>
                                                 ${member.extra_text ? `<div style="font-size: 14px; color: #6c757d; word-wrap: break-word; word-break: break-all;">${escapeHtml(member.extra_text)}</div>` : ''}
                                             </div>
@@ -336,7 +336,7 @@
                                                 ${escapeHtml(history.name)}
                                             </div>
                                             <div style="flex: 0 0 auto;">
-                                                <span class="status-badge status-${history.status}">${statusText}${proxyMarker}</span>
+                                                <span class="status-badge status-${history.status}">${statusText}</span>${proxyMarker}
                                             </div>
                                             <div style="flex: 1; font-size: 14px; color: #6c757d; white-space: nowrap; overflow: hidden;">
                                                 ${history.extra_text ? escapeHtml(history.extra_text) : ''}

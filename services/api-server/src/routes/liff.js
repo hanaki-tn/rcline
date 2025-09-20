@@ -342,6 +342,18 @@ router.get('/events/:id', requireLineUser, async (req, res) => {
       });
     });
 
+    // 対象者確認
+    const targetCheckSql = `
+      SELECT 1 FROM event_targets WHERE event_id = ? AND member_id = ?
+    `;
+
+    const isTarget = await new Promise((resolve, reject) => {
+      req.db.get(targetCheckSql, [eventId, member.id], (err, row) => {
+        if (err) reject(err);
+        else resolve(!!row);
+      });
+    });
+
     // 回答履歴取得
     const responseHistorySql = `
       SELECT er.responded_at, m.name, er.status, er.extra_text, er.via
@@ -368,7 +380,7 @@ router.get('/events/:id', requireLineUser, async (req, res) => {
       image_preview_url: event.image_preview_url,
       extra_text_enabled: !!event.extra_text_enabled,
       extra_text_label: event.extra_text_label,
-      can_respond: true, // 対象者は回答可能
+      can_respond: isTarget, // 対象者のみ回答可能
       my_response: myResponse ? {
         status: myResponse.status,
         extra_text: myResponse.extra_text,

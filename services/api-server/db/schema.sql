@@ -35,7 +35,9 @@ CREATE TABLE audiences (
   name             TEXT NOT NULL UNIQUE,
   sort_order       INTEGER,
   created_at       TEXT NOT NULL,
-  updated_at       TEXT NOT NULL
+  updated_at       TEXT NOT NULL,
+  del_flg          INTEGER NOT NULL DEFAULT 0,
+  deleted_at       TEXT
 );
 
 -- グループ所属
@@ -47,6 +49,9 @@ CREATE TABLE audience_members (
   FOREIGN KEY(member_id)   REFERENCES members(id)   ON UPDATE CASCADE ON DELETE CASCADE
 );
 CREATE INDEX idx_audmem_member ON audience_members(member_id);
+
+-- audiencesテーブルのインデックス
+CREATE INDEX IF NOT EXISTS idx_audiences_active ON audiences(id, sort_order, del_flg);
 
 -- イベント
 CREATE TABLE events (
