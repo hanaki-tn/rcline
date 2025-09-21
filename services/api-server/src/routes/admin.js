@@ -909,7 +909,9 @@ router.post('/events', requireAuth, upload.single('image'), [
                   }
                   
                   // LIFFメッセージを構築
-                  const liffUrl = `https://liff.line.me/2007866921-LkR3yg4k?id=${eventId}`;
+                  // 環境変数からLIFF_IDを取得（未設定時はデフォルト値を使用）
+                  const liffId = process.env.LIFF_ID || '2007866921-kw3W8dBv';
+                  const liffUrl = `https://liff.line.me/${liffId}?view=detail&id=${eventId}`;
                   
                   // プレビュー画像URLを構築（httpsスキーム必須）
                   const fullPreviewImageUrl = event.image_preview_url 

@@ -10,6 +10,53 @@ let eventsData = [];
 let sortStates = {};
 let modalCallback = null;
 
+// ========== イベント作成リファクタリング: Step 1 基盤整備 ==========
+// DOM要素ID定数
+const EL = {
+  form: 'event-form',
+  chkExtra: 'extra-text-enabled',
+  extraOpts: 'extra-text-options',
+  extraLabel: 'extra-text-label',
+  audience: 'event-audience',
+  heldAt: 'event-held-at',         // <input type="datetime-local">
+  deadlineAt: 'event-deadline-at', // <input type="date">
+  body: 'event-body',
+  title: 'event-title',
+  image: 'event-image',
+  preview: 'target-preview',
+  msg: 'event-create-message',
+  submitBtn: 'event-create-button',
+};
+
+// DOMヘルパー
+const $ = (id) => document.getElementById(id);
+
+// 日付ユーティリティ（JST固定）
+const toJstIsoFromDatetimeLocal = (value) => {
+  if (!value) return null;
+  // value例: "2025-09-21T18:30"
+  const [d, t] = value.split('T');
+  return `${d}T${t}:00+09:00`;
+};
+
+const endOfDayJstIsoFromDate = (value) => {
+  if (!value) return null;
+  return `${value}T23:59:59+09:00`;
+};
+
+// イベントフォーム状態オブジェクト
+let eventFormState = {
+  title: '',
+  body: '',
+  imageFile: null,
+  held_at: null,            // ISO8601 JST
+  deadline_at: null,        // ISO8601 JST(23:59:59)
+  audience_id: null,
+  extra_text_enabled: false,
+  extra_text_label: '備考',
+  target_member_ids: [],    // 送信対象の最終配列
+};
+
 // ========== 認証関連 ==========
 async function login() {
     const username = document.getElementById('username').value;
@@ -379,7 +426,11 @@ async function loadAudiencesForEvents() {
         // 最初のオプションをデフォルトで選択
         if (audiencesData.length > 0) {
             select.value = audiencesData[0].id;
-            updateTargetPreview();
+            // 状態管理版: audience_idを設定してプレビュー更新
+            eventFormState.audience_id = audiencesData[0].id;
+            const memberIds = await resolveTargetMemberIds(eventFormState.audience_id);
+            eventFormState.target_member_ids = memberIds;
+            renderTargetPreview(memberIds);
         }
     } catch (error) {
         console.error('Audiences読み込みエラー:', error);
@@ -401,38 +452,113 @@ async function loadMembersForEvents() {
     }
 }
 
-function initializeEventForm() {
+// バックアップ: 旧版initializeEventForm
+function initializeEventFormOld() {
     // 追加メモ欄の表示/非表示
     document.getElementById('extra-text-enabled').addEventListener('change', function() {
         const options = document.getElementById('extra-text-options');
         options.classList.toggle('hidden', !this.checked);
     });
-    
+
     // フォーム送信
     const form = document.getElementById('event-form');
     form.onsubmit = async function(e) {
         e.preventDefault();
-        
+
         confirmAction('公式LINEへ送信しますか？', async () => {
             await createEvent();
         });
     };
 }
 
-async function createEvent() {
+// Step 3: 新しい状態管理版initializeEventForm
+function initializeEventForm() {
+    // 状態→DOM 初期反映
+    $(EL.chkExtra).checked = eventFormState.extra_text_enabled;
+    $(EL.extraLabel).value = eventFormState.extra_text_label;
+    $(EL.extraOpts).classList.toggle('hidden', !eventFormState.extra_text_enabled);
+
+    // 入力ハンドラ（DOM→状態）
+    $(EL.title).addEventListener('input', e => eventFormState.title = e.target.value);
+    $(EL.body).addEventListener('input', e => eventFormState.body = e.target.value);
+    $(EL.image).addEventListener('change', e => eventFormState.imageFile = e.target.files?.[0] ?? null);
+    $(EL.heldAt).addEventListener('change', e => eventFormState.held_at = toJstIsoFromDatetimeLocal(e.target.value));
+    $(EL.deadlineAt).addEventListener('change', e => eventFormState.deadline_at = endOfDayJstIsoFromDate(e.target.value));
+    $(EL.audience).addEventListener('change', onAudienceChange);
+
+    $(EL.chkExtra).addEventListener('change', e => {
+        eventFormState.extra_text_enabled = e.target.checked;
+        $(EL.extraOpts).classList.toggle('hidden', !e.target.checked);
+    });
+    $(EL.extraLabel).addEventListener('input', e => eventFormState.extra_text_label = e.target.value);
+
+    // 送信ハンドラ
+    $(EL.form).onsubmit = async (ev) => {
+        ev.preventDefault();
+        confirmAction('公式LINEへ送信しますか？', () => createEvent());
+    };
+}
+
+// Step 3: 受信者プレビュー・対象更新（状態連携版）
+async function onAudienceChange(e) {
+    eventFormState.audience_id = e.target.value || null;
+    // audience_idに応じて対象メンバーIDsを取得する既存処理を呼ぶ
+    const memberIds = await resolveTargetMemberIds(eventFormState.audience_id);
+    eventFormState.target_member_ids = memberIds;
+    renderTargetPreview(memberIds);
+}
+
+async function resolveTargetMemberIds(audienceId) {
+    if (!audienceId) return [];
+    try {
+        const response = await fetch(`/api/admin/audiences/${audienceId}/members`, {
+            credentials: 'include'
+        });
+        if (response.ok) {
+            const data = await response.json();
+            return data.items.map(member => member.member_id);
+        }
+    } catch (error) {
+        console.error('Audience members取得エラー:', error);
+    }
+    return [];
+}
+
+function renderTargetPreview(memberIds) {
+    const previewDiv = $(EL.preview);
+    if (!memberIds?.length) {
+        previewDiv.innerHTML = '<p>配信対象を選択してください</p>';
+        return;
+    }
+
+    const targetMembers = allMembers.filter(member => memberIds.includes(member.id));
+    targetMembers.sort((a, b) => (a.display_order || 999) - (b.display_order || 999));
+
+    let html = `<p><strong>対象: ${targetMembers.length}名</strong></p>`;
+    html += '<div style="max-height: 150px; overflow-y: auto; border: 1px solid #ddd; padding: 5px; border-radius: 6px;">';
+    targetMembers.forEach(member => {
+        html += `<div>${member.name}</div>`;
+    });
+    html += '</div>';
+
+    previewDiv.innerHTML = html;
+}
+
+// バックアップ: 旧版createEvent
+async function createEventOld() {
     const messageDiv = document.getElementById('event-create-message');
     const form = document.getElementById('event-form');
     const formData = new FormData();
-    
+
     // 基本項目
     formData.append('title', document.getElementById('event-title').value);
     formData.append('body', document.getElementById('event-body').value);
-    
+
     const imageFile = document.getElementById('event-image').files[0];
     if (imageFile) {
         formData.append('image', imageFile);
     }
-    
+
     formData.append('extra_text_label', document.getElementById('extra-text-label').value);
 
     // 対象メンバー取得
@@ -468,9 +594,9 @@ async function createEvent() {
         showToast('対象メンバーが見つかりません', 'error');
         return;
     }
-    
+
     formData.append('target_member_ids', JSON.stringify(targetMemberIds));
-    
+
     // 日時処理
     const heldAtInput = document.getElementById('event-held-at');
     if (heldAtInput.value) {
@@ -479,27 +605,27 @@ async function createEvent() {
         const iso8601 = jstDateTime.toISOString().slice(0, 19) + '+09:00';
         formData.append('held_at', iso8601);
     }
-    
+
     const deadlineAtInput = document.getElementById('event-deadline-at');
     if (deadlineAtInput.value) {
         const deadlineDate = deadlineAtInput.value + 'T23:59:59+09:00';
         formData.append('deadline_at', deadlineDate);
     }
-    
+
     const extraTextEnabled = document.getElementById('extra-text-enabled').checked;
     formData.append('extra_text_enabled', extraTextEnabled ? 'true' : 'false');
-    
+
     messageDiv.innerHTML = '<div class="info">作成中...</div>';
-    
+
     try {
         const response = await fetch('/api/admin/events', {
             method: 'POST',
             credentials: 'include',
             body: formData
         });
-        
+
         const data = await response.json();
-        
+
         if (response.ok) {
             showToast('イベントを作成しました', 'success');
             form.reset();
@@ -524,43 +650,92 @@ async function createEvent() {
     }
 }
 
+// Step 4: 新しい状態管理版createEvent
+async function createEvent() {
+    const btn = $(EL.submitBtn);
+    btn.disabled = true;
 
-async function updateTargetPreview() {
-    const previewDiv = document.getElementById('target-preview');
-    const eventAudienceSelect = document.getElementById('event-audience');
-
-    if (!eventAudienceSelect || !eventAudienceSelect.value) {
-        previewDiv.innerHTML = '<p>配信対象を選択してください</p>';
-        return;
-    }
-    
     try {
-        const selectedAudienceId = parseInt(eventAudienceSelect.value);
-        const response = await fetch(`/api/admin/audiences/${selectedAudienceId}/members`, {
-            credentials: 'include'
-        });
-        
-        if (response.ok) {
-            const data = await response.json();
-            const targetMemberIds = new Set(data.items.map(member => member.member_id));
-            const targetMembers = allMembers.filter(member => targetMemberIds.has(member.id));
-            targetMembers.sort((a, b) => (a.display_order || 999) - (b.display_order || 999));
-            
-            let html = `<p><strong>対象: ${targetMembers.length}名</strong></p>`;
-            html += '<div style="max-height: 150px; overflow-y: auto; border: 1px solid #ddd; padding: 5px; border-radius: 6px;">';
-            targetMembers.forEach(member => {
-                html += `<div>${member.name}</div>`;
-            });
-            html += '</div>';
-            
-            previewDiv.innerHTML = html;
-        } else {
-            previewDiv.innerHTML = '<div class="error">メンバー情報の取得に失敗しました</div>';
+        const errors = validateEvent(eventFormState);
+        if (errors.length) {
+            showToast(errors[0], 'error');
+            return;
         }
+
+        const formData = new FormData();
+        formData.append('title', eventFormState.title);
+        formData.append('body', eventFormState.body);
+        if (eventFormState.imageFile) {
+            formData.append('image', eventFormState.imageFile);
+        }
+        formData.append('held_at', eventFormState.held_at);
+        formData.append('deadline_at', eventFormState.deadline_at);
+        formData.append('extra_text_enabled', eventFormState.extra_text_enabled);
+        formData.append('extra_text_label', eventFormState.extra_text_label);
+        formData.append('target_member_ids', JSON.stringify(eventFormState.target_member_ids));
+
+        const response = await fetch('/api/admin/events', {
+            method: 'POST',
+            credentials: 'include',
+            body: formData
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showToast('イベントを作成しました', 'success');
+            $(EL.msg).innerHTML = `
+                <div class="success">
+                    イベントID: ${data.event_id}<br>
+                    対象者: ${data.targets}名<br>
+                    送信成功: ${data.push.success}件、失敗: ${data.push.fail}件
+                </div>
+            `;
+            resetEventForm();
+        } else {
+            throw new Error(data.message || 'イベント作成に失敗しました');
+        }
+
     } catch (error) {
-        previewDiv.innerHTML = `<div class="error">プレビュー取得エラー: ${error.message}</div>`;
+        console.error('イベント作成エラー:', error);
+        showToast('イベント作成に失敗しました', 'error');
+        $(EL.msg).innerHTML = `<div class="error">${error.message}</div>`;
+    } finally {
+        btn.disabled = false;
     }
 }
+
+function validateEvent(state) {
+    const errors = [];
+    if (!state.title?.trim()) errors.push('タイトルは必須です');
+    if (!state.body?.trim()) errors.push('本文は必須です');
+    if (!state.held_at) errors.push('開催日時を入力してください');
+    if (!state.deadline_at) errors.push('回答期限日を入力してください');
+    if (!state.audience_id) errors.push('配信対象を選択してください');
+    if (!state.target_member_ids?.length) errors.push('配信対象メンバーが空です');
+    return errors;
+}
+
+function resetEventForm() {
+    // 状態リセット
+    eventFormState = {
+        title: '',
+        body: '',
+        imageFile: null,
+        held_at: null,
+        deadline_at: null,
+        audience_id: null,
+        extra_text_enabled: false,
+        extra_text_label: '備考',
+        target_member_ids: [],
+    };
+    // UIリセット
+    $(EL.form).reset();
+    $(EL.extraOpts).classList.add('hidden');
+    $(EL.preview).innerHTML = '<p>配信対象を選択してください</p>';
+}
+
+
 
 // イベント詳細
 function showEventDetail(eventId) {
