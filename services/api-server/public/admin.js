@@ -57,6 +57,48 @@ let eventFormState = {
   target_member_ids: [],    // 送信対象の最終配列
 };
 
+// ブラッシュアップ: 送信制御フラグ
+let isSubmitting = false;
+let isAudienceLoaded = false;
+let isMembersResolved = false;
+let eventFormBound = false; // リスナー多重登録防止
+
+// ブラッシュアップ: DOM→状態の同期関数（初期化時＆送信直前に実行）
+function hydrateFromDOM() {
+  // DOM要素が存在しない場合のガード（他のセクション表示時）
+  if (!$(EL.title) || !$(EL.body)) return;
+
+  eventFormState.title = $(EL.title).value?.trim() || '';
+  eventFormState.body = $(EL.body).value?.trim() || '';
+  eventFormState.imageFile = $(EL.image).files?.[0] ?? null;
+  eventFormState.held_at = toJstIsoFromDatetimeLocal($(EL.heldAt).value || '');
+  eventFormState.deadline_at = endOfDayJstIsoFromDate($(EL.deadlineAt).value || '');
+  eventFormState.audience_id = $(EL.audience).value || null;
+  eventFormState.extra_text_enabled = $(EL.chkExtra).checked;
+  eventFormState.extra_text_label = $(EL.extraLabel).value?.trim() || '備考';
+
+  // UI同期
+  $(EL.extraOpts).classList.toggle('hidden', !eventFormState.extra_text_enabled);
+}
+
+// ブラッシュアップ: 送信ボタンの有効/無効制御
+function setSubmitButtonEnabled() {
+  const btn = $(EL.submitBtn);
+  if (!btn) return;
+
+  const ready = isAudienceLoaded && isMembersResolved && !isSubmitting;
+  btn.disabled = !ready;
+
+  // ブラッシュアップ: ボタンラベルで状態を可視化
+  if (isSubmitting) {
+    btn.textContent = '送信中...';
+  } else if (!isAudienceLoaded || !isMembersResolved) {
+    btn.textContent = '読み込み中...';
+  } else {
+    btn.textContent = 'イベント作成＆送信';
+  }
+}
+
 // ========== 認証関連 ==========
 async function login() {
     const username = document.getElementById('username').value;
@@ -384,18 +426,28 @@ function filterEvents() {
 
 // イベント作成フォーム初期化
 async function loadEventForm() {
-    await loadAudiencesForEvents();
+    // ブラッシュアップ: membersを先に読み込み（renderTargetPreviewで必要）
     await loadMembersForEvents();
+    await loadAudiencesForEvents();
     initializeEventForm();
 }
 
 async function loadAudiencesForEvents() {
+    isAudienceLoaded = false;
+    setSubmitButtonEnabled();
+
     try {
         const response = await fetch('/api/admin/audiences', {
             credentials: 'include'
         });
-        
-        if (!response.ok) return;
+
+        if (!response.ok) {
+            // ブラッシュアップ: 非200レスポンスの適切な処理
+            showToast('配信グループの取得に失敗しました（認証が必要かも）', 'error');
+            isAudienceLoaded = false;
+            setSubmitButtonEnabled();
+            return;
+        }
         
         const data = await response.json();
         audiencesData = data.items;
@@ -431,9 +483,24 @@ async function loadAudiencesForEvents() {
             const memberIds = await resolveTargetMemberIds(eventFormState.audience_id);
             eventFormState.target_member_ids = memberIds;
             renderTargetPreview(memberIds);
+        } else {
+            // ブラッシュアップ: デフォルト選択を行わない場合も対象未解決扱い
+            isMembersResolved = false;
         }
+
+        // 読み込み完了
+        isAudienceLoaded = true;
+        // ブラッシュアップ: audience未選択時は対象未解決扱い
+        if (audiencesData.length === 0) {
+            isMembersResolved = false; // audience未選択＝対象未解決扱い
+        }
+        setSubmitButtonEnabled();
     } catch (error) {
         console.error('Audiences読み込みエラー:', error);
+        // ブラッシュアップ: 非同期エラーの見える化
+        showToast('配信グループの取得に失敗しました', 'error');
+        isAudienceLoaded = false;
+        setSubmitButtonEnabled();
     }
 }
 
@@ -442,13 +509,19 @@ async function loadMembersForEvents() {
         const response = await fetch('/api/admin/members?role=member', {
             credentials: 'include'
         });
-        
-        if (!response.ok) return;
+
+        if (!response.ok) {
+            // ブラッシュアップ: 非200レスポンスの適切な処理
+            showToast('メンバー情報の取得に失敗しました（認証が必要かも）', 'error');
+            return;
+        }
         
         const data = await response.json();
         allMembers = data.items;
     } catch (error) {
         console.error('Members読み込みエラー:', error);
+        // ブラッシュアップ: 非同期エラーの見える化
+        showToast('メンバー情報の取得に失敗しました', 'error');
     }
 }
 
@@ -471,36 +544,42 @@ function initializeEventFormOld() {
     };
 }
 
-// Step 3: 新しい状態管理版initializeEventForm
+// Step 3: ブラッシュアップ版initializeEventForm
 function initializeEventForm() {
-    // 状態→DOM 初期反映
-    $(EL.chkExtra).checked = eventFormState.extra_text_enabled;
-    $(EL.extraLabel).value = eventFormState.extra_text_label;
-    $(EL.extraOpts).classList.toggle('hidden', !eventFormState.extra_text_enabled);
+    // ブラッシュアップ: 初回のDOM→状態取り込み
+    hydrateFromDOM();
 
-    // 入力ハンドラ（DOM→状態）
-    $(EL.title).addEventListener('input', e => eventFormState.title = e.target.value);
-    $(EL.body).addEventListener('input', e => eventFormState.body = e.target.value);
-    $(EL.image).addEventListener('change', e => eventFormState.imageFile = e.target.files?.[0] ?? null);
-    $(EL.heldAt).addEventListener('change', e => eventFormState.held_at = toJstIsoFromDatetimeLocal(e.target.value));
-    $(EL.deadlineAt).addEventListener('change', e => eventFormState.deadline_at = endOfDayJstIsoFromDate(e.target.value));
-    $(EL.audience).addEventListener('change', onAudienceChange);
+    // ブラッシュアップ: リスナー多重登録防止
+    if (!eventFormBound) {
+        // 入力ハンドラ（全inputでhydrateFromDOMを呼ぶ）
+        $(EL.title).addEventListener('input', hydrateFromDOM);
+        $(EL.body).addEventListener('input', hydrateFromDOM);
+        $(EL.image).addEventListener('change', hydrateFromDOM);
+        $(EL.heldAt).addEventListener('change', hydrateFromDOM);
+        $(EL.deadlineAt).addEventListener('change', hydrateFromDOM);
+        $(EL.chkExtra).addEventListener('change', hydrateFromDOM);
+        $(EL.extraLabel).addEventListener('input', hydrateFromDOM);
 
-    $(EL.chkExtra).addEventListener('change', e => {
-        eventFormState.extra_text_enabled = e.target.checked;
-        $(EL.extraOpts).classList.toggle('hidden', !e.target.checked);
-    });
-    $(EL.extraLabel).addEventListener('input', e => eventFormState.extra_text_label = e.target.value);
+        // audience変更時は特別処理
+        $(EL.audience).addEventListener('change', onAudienceChange);
 
-    // 送信ハンドラ
-    $(EL.form).onsubmit = async (ev) => {
-        ev.preventDefault();
-        confirmAction('公式LINEへ送信しますか？', () => createEvent());
-    };
+        // 送信ハンドラ
+        $(EL.form).onsubmit = async (ev) => {
+            ev.preventDefault();
+            // confirmActionを使う場合
+            confirmAction('公式LINEへ送信しますか？', () => createEvent());
+        };
+
+        eventFormBound = true;
+    }
+
+    // 初期状態でボタンを無効化
+    setSubmitButtonEnabled();
 }
 
-// Step 3: 受信者プレビュー・対象更新（状態連携版）
+// Step 3: 受信者プレビュー・対象更新（ブラッシュアップ版）
 async function onAudienceChange(e) {
+    hydrateFromDOM(); // 状態を同期
     eventFormState.audience_id = e.target.value || null;
     // audience_idに応じて対象メンバーIDsを取得する既存処理を呼ぶ
     const memberIds = await resolveTargetMemberIds(eventFormState.audience_id);
@@ -509,18 +588,37 @@ async function onAudienceChange(e) {
 }
 
 async function resolveTargetMemberIds(audienceId) {
-    if (!audienceId) return [];
+    if (!audienceId) {
+        isMembersResolved = false;
+        setSubmitButtonEnabled();
+        return [];
+    }
+
+    isMembersResolved = false;
+    setSubmitButtonEnabled();
+
     try {
         const response = await fetch(`/api/admin/audiences/${audienceId}/members`, {
             credentials: 'include'
         });
         if (response.ok) {
             const data = await response.json();
-            return data.items.map(member => member.member_id);
+            const memberIds = data.items.map(member => member.member_id);
+            isMembersResolved = true;
+            setSubmitButtonEnabled();
+            return memberIds;
+        } else {
+            // ブラッシュアップ: 非200レスポンスの適切な処理
+            showToast('配信対象メンバーの取得に失敗しました（認証が必要かも）', 'error');
         }
     } catch (error) {
         console.error('Audience members取得エラー:', error);
+        // ブラッシュアップ: 非同期エラーの見える化
+        showToast('配信対象メンバーの取得に失敗しました', 'error');
     }
+
+    isMembersResolved = false;
+    setSubmitButtonEnabled();
     return [];
 }
 
@@ -531,7 +629,9 @@ function renderTargetPreview(memberIds) {
         return;
     }
 
-    const targetMembers = allMembers.filter(member => memberIds.includes(member.id));
+    // ブラッシュアップ: 型ゆらぎガード（文字列/数値の安全な比較）
+    const idSet = new Set(memberIds.map(v => Number(v)));
+    const targetMembers = allMembers.filter(member => idSet.has(Number(member.id)));
     targetMembers.sort((a, b) => (a.display_order || 999) - (b.display_order || 999));
 
     let html = `<p><strong>対象: ${targetMembers.length}名</strong></p>`;
@@ -650,15 +750,31 @@ async function createEventOld() {
     }
 }
 
-// Step 4: 新しい状態管理版createEvent
+// Step 4: ブラッシュアップ版createEvent
 async function createEvent() {
+    // 二重送信防止
+    if (isSubmitting) return;
+
+    // 送信直前の最終DOM→状態同期
+    hydrateFromDOM();
+
+    // audience選択時のメンバー再解決（レース条件対策）
+    if (eventFormState.audience_id && !eventFormState.target_member_ids?.length) {
+        eventFormState.target_member_ids = await resolveTargetMemberIds(eventFormState.audience_id);
+    }
+
     const btn = $(EL.submitBtn);
-    btn.disabled = true;
 
     try {
+        isSubmitting = true;
+        btn.disabled = true;
+        // ブラッシュアップ: 送信中ラベルの即時反映
+        setSubmitButtonEnabled();
+
         const errors = validateEvent(eventFormState);
         if (errors.length) {
             showToast(errors[0], 'error');
+            $(EL.msg).innerHTML = `<div class="error">${errors.join('<br>')}</div>`;
             return;
         }
 
@@ -670,9 +786,12 @@ async function createEvent() {
         }
         formData.append('held_at', eventFormState.held_at);
         formData.append('deadline_at', eventFormState.deadline_at);
-        formData.append('extra_text_enabled', eventFormState.extra_text_enabled);
+        // ブラッシュアップ: booleanを明示的な文字列に
+        formData.append('extra_text_enabled', eventFormState.extra_text_enabled ? 'true' : 'false');
         formData.append('extra_text_label', eventFormState.extra_text_label);
         formData.append('target_member_ids', JSON.stringify(eventFormState.target_member_ids));
+
+        $(EL.msg).innerHTML = '<div class="info">作成中...</div>';
 
         const response = await fetch('/api/admin/events', {
             method: 'POST',
@@ -680,20 +799,43 @@ async function createEvent() {
             body: formData
         });
 
-        const data = await response.json();
+        // ブラッシュアップ: エラーレスポンスのパース耐性向上
+        let data = null;
+        let responseText = '';
+        try {
+            data = await response.json();
+        } catch (jsonError) {
+            // JSONパースに失敗した場合はテキストとして取得
+            try {
+                responseText = await response.text();
+            } catch {
+                responseText = '';
+            }
+        }
 
         if (response.ok) {
             showToast('イベントを作成しました', 'success');
-            $(EL.msg).innerHTML = `
-                <div class="success">
-                    イベントID: ${data.event_id}<br>
-                    対象者: ${data.targets}名<br>
-                    送信成功: ${data.push.success}件、失敗: ${data.push.fail}件
-                </div>
-            `;
+
+            // ブラッシュアップ: dataが無い/型が違うケースを吸収
+            const eventId = data && data.event_id;
+            const targets = data && typeof data.targets === 'number' ? data.targets : null;
+            const pushSuccess = data && data.push ? data.push.success : null;
+            const pushFail = data && data.push ? data.push.fail : null;
+
+            const summaryHtml = (eventId || targets != null || pushSuccess != null)
+                ? `<div class="success">
+                     ${eventId ? `イベントID: ${eventId}<br>` : ''}
+                     ${targets != null ? `対象者: ${targets}名<br>` : ''}
+                     ${(pushSuccess != null && pushFail != null) ? `送信成功: ${pushSuccess}件、失敗: ${pushFail}件` : ''}
+                   </div>`
+                : `<div class="success">イベントを作成しました</div>`;
+
+            $(EL.msg).innerHTML = summaryHtml;
             resetEventForm();
         } else {
-            throw new Error(data.message || 'イベント作成に失敗しました');
+            // エラーメッセージの優先順位: data.message > responseText > デフォルト
+            const errorMsg = (data && data.message) || responseText || 'イベント作成に失敗しました';
+            throw new Error(errorMsg);
         }
 
     } catch (error) {
@@ -701,7 +843,8 @@ async function createEvent() {
         showToast('イベント作成に失敗しました', 'error');
         $(EL.msg).innerHTML = `<div class="error">${error.message}</div>`;
     } finally {
-        btn.disabled = false;
+        isSubmitting = false;
+        setSubmitButtonEnabled();
     }
 }
 
@@ -709,6 +852,21 @@ function validateEvent(state) {
     const errors = [];
     if (!state.title?.trim()) errors.push('タイトルは必須です');
     if (!state.body?.trim()) errors.push('本文は必須です');
+
+    // ブラッシュアップ: 画像必須チェック＆サイズ・形式チェック
+    if (!state.imageFile) {
+        errors.push('画像は必須です（JPG/PNG、5MB以下）');
+    } else {
+        // ファイルサイズチェック（5MB）
+        if (state.imageFile.size > 5 * 1024 * 1024) {
+            errors.push('画像サイズが5MBを超えています');
+        }
+        // ファイル形式チェック（JPG/PNG）
+        if (!/^image\/(jpe?g|png)$/i.test(state.imageFile.type)) {
+            errors.push('画像はJPG/PNGのみ対応です');
+        }
+    }
+
     if (!state.held_at) errors.push('開催日時を入力してください');
     if (!state.deadline_at) errors.push('回答期限日を入力してください');
     if (!state.audience_id) errors.push('配信対象を選択してください');
@@ -732,7 +890,19 @@ function resetEventForm() {
     // UIリセット
     $(EL.form).reset();
     $(EL.extraOpts).classList.add('hidden');
-    $(EL.preview).innerHTML = '<p>配信対象を選択してください</p>';
+
+    // ブラッシュアップ: リセット後の状態同期
+    hydrateFromDOM();
+
+    // audience選択状態を確認し、必要に応じてプレビューを更新
+    if (eventFormState.audience_id) {
+        resolveTargetMemberIds(eventFormState.audience_id).then(ids => {
+            eventFormState.target_member_ids = ids;
+            renderTargetPreview(ids);
+        });
+    } else {
+        $(EL.preview).innerHTML = '<p>配信対象を選択してください</p>';
+    }
 }
 
 
@@ -1458,9 +1628,25 @@ document.addEventListener('DOMContentLoaded', function() {
     if (loginForm) {
         loginForm.addEventListener('submit', async function(e) {
             e.preventDefault(); // デフォルトのフォーム送信を阻止
-            
+
             // 既存のlogin()関数を呼び出し
             await login();
         });
+    }
+
+    // ブラッシュアップ: イベントフォームが存在する場合、初回同期
+    if ($(EL.form)) {
+        hydrateFromDOM();
+    }
+});
+
+// ブラッシュアップ: ブラウザ履歴戻り(BFCache)対策
+window.addEventListener('pageshow', function(event) {
+    // Back-Forward Cache から復帰した場合もDOM→状態を同期
+    if (event.persisted || performance.navigation.type === 2) {
+        if ($(EL.form)) {
+            hydrateFromDOM();
+            setSubmitButtonEnabled();
+        }
     }
 });
