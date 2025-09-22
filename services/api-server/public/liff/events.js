@@ -1,6 +1,8 @@
 // RC公式LINE LIFF イベント管理
 // events.html のスクリプト部分を分離
 
+console.log('[DEBUG] events.js が正常に読み込まれました');
+
 // アプリケーションの状態管理
 const EventApp = {
     currentUser: null,
@@ -148,9 +150,9 @@ function displayEventList() {
         const deadlineDate = event.deadline_at ? formatDate(event.deadline_at) : null;
 
         // デバッグログ（期限表示されない問題の調査用）
+        console.log('デバッグ - イベント:', event.title);
+        console.log('- deadline_at:', event.deadline_at);
         if (event.deadline_at) {
-            console.log('デバッグ - イベント:', event.title);
-            console.log('- deadline_at:', event.deadline_at);
             console.log('- status:', status);
             console.log('- deadlineDate:', deadlineDate);
             console.log('- 表示条件:', status === 'pending' && deadlineDate);
