@@ -463,16 +463,38 @@
                 align-items: center;
                 justify-content: center;
                 z-index: 1000;
-                cursor: pointer;
+                cursor: zoom-out;
+                overflow: auto;
             `;
 
             const img = document.createElement('img');
             img.src = imageUrl;
             img.style.cssText = `
-                max-width: 95%;
-                max-height: 95%;
-                object-fit: contain;
+                display: block;
+                margin: auto;
+                max-width: none;
+                max-height: none;
+                width: auto;
+                height: auto;
+                cursor: zoom-out;
             `;
+
+            // 画像の初期表示サイズを画面に収める
+            img.onload = function() {
+                const windowWidth = window.innerWidth * 0.95;
+                const windowHeight = window.innerHeight * 0.95;
+                const imgWidth = this.naturalWidth;
+                const imgHeight = this.naturalHeight;
+
+                const widthRatio = windowWidth / imgWidth;
+                const heightRatio = windowHeight / imgHeight;
+                const scale = Math.min(widthRatio, heightRatio, 1);
+
+                if (scale < 1) {
+                    this.style.width = (imgWidth * scale) + 'px';
+                    this.style.height = (imgHeight * scale) + 'px';
+                }
+            };
 
             overlay.appendChild(img);
             overlay.onclick = () => document.body.removeChild(overlay);
