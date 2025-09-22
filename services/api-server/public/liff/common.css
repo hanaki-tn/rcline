@@ -234,10 +234,10 @@ a.event-card:active {
     color: #ffffff;
 }
 
-/* 締切日時（今後の実装用） */
+/* 締切日時 */
 .event-deadline {
     font-size: 13px;
-    color: #dc3545;
+    color: #007bff;
     margin-left: auto;
 }
 
