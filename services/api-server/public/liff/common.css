@@ -486,3 +486,68 @@ a.event-card:active {
 .d-flex { display: flex; }
 
 .w-100 { width: 100%; }
+
+/* 状態クラス（リファクタリングで追加） */
+.is-hidden {
+    display: none !important;
+}
+
+.is-loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.is-disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.is-selected {
+    outline: 2px solid #06C755;
+}
+
+/* イベントカードボタンスタイル */
+.event-card__btn {
+    min-width: 120px;
+}
+
+/* 画像プレースホルダー（アスペクト比予約） */
+.image-placeholder {
+    width: 100%;
+    aspect-ratio: 3/4; /* A4縦向け */
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.image-placeholder__loading {
+    color: #6c757d;
+    font-size: 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.image-placeholder__image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 6px;
+    cursor: pointer;
+    position: absolute;
+    top: 0;
+    left: 0;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.image-placeholder__image.loaded {
+    opacity: 1;
+}
