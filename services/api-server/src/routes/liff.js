@@ -164,7 +164,7 @@ router.get('/events', requireLineUser, async (req, res) => {
     }
 
     req.db.all(`
-      SELECT DISTINCT e.id, e.title, e.held_at,
+      SELECT DISTINCT e.id, e.title, e.held_at, e.deadline_at,
              COALESCE((
                SELECT er.status
                FROM event_responses er
@@ -190,6 +190,7 @@ router.get('/events', requireLineUser, async (req, res) => {
         id: row.id,
         title: row.title,
         held_at: row.held_at,
+        deadline_at: row.deadline_at,
         my_response: {
           status: row.my_status
         }
