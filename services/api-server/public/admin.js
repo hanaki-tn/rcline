@@ -44,6 +44,25 @@ const endOfDayJstIsoFromDate = (value) => {
   return `${value}T23:59:59+09:00`;
 };
 
+// 日付フォーマット関数の共通化
+const fmtDateTimeJp = (dateStr) => {
+  if (!dateStr) return '—';
+  try {
+    return new Date(dateStr).toLocaleString('ja-JP');
+  } catch {
+    return '—';
+  }
+};
+
+const fmtDateJp = (dateStr) => {
+  if (!dateStr) return '—';
+  try {
+    return new Date(dateStr).toLocaleDateString('ja-JP');
+  } catch {
+    return '—';
+  }
+};
+
 // イベントフォーム状態オブジェクト
 let eventFormState = {
   title: '',
@@ -55,6 +74,21 @@ let eventFormState = {
   extra_text_enabled: false,
   extra_text_label: '備考',
   target_member_ids: [],    // 送信対象の最終配列
+};
+
+// イベント一覧状態管理
+let eventsListState = {
+  isLoading: false,
+  hasError: false,
+  errorMessage: ''
+};
+
+// メッセージ送信状態管理
+let messageState = {
+  isLoading: false,
+  isSubmitting: false,
+  selectedAudienceId: null,
+  audienceLoaded: false
 };
 
 // ブラッシュアップ: 送信制御フラグ
@@ -365,39 +399,108 @@ function filterMembers() {
 }
 
 // ========== イベント管理 ==========
-async function loadEvents() {
-    try {
-        const response = await fetch('/api/admin/events?sort=id_desc', {
+// APIクライアント層
+const api = {
+    async getEvents() {
+        const response = await fetch('/api/admin/events', {
             credentials: 'include'
         });
-        
-        if (!response.ok) throw new Error('認証が必要です');
-        
-        const data = await response.json();
+        if (!response.ok) {
+            if (response.status === 401) throw new Error('認証が必要です');
+            throw new Error('イベント一覧の取得に失敗しました');
+        }
+        return response.json();
+    },
+
+    async getEventDetail(eventId) {
+        const response = await fetch(`/api/admin/events/${eventId}`, {
+            credentials: 'include'
+        });
+        if (!response.ok) {
+            if (response.status === 401) throw new Error('認証が必要です');
+            throw new Error('イベント詳細の取得に失敗しました');
+        }
+        return response.json();
+    },
+
+    async postProxyResponse(eventId, memberId, status, extraText) {
+        const response = await fetch('/api/admin/proxy-response', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+                event_id: eventId,
+                member_id: memberId,
+                status: status,
+                extra_text: extraText || ''
+            })
+        });
+        if (!response.ok) {
+            throw new Error('代理回答の送信に失敗しました');
+        }
+        return response.json();
+    },
+
+    async getMessageAudiences() {
+        const response = await fetch('/api/admin/messages/audiences', {
+            credentials: 'include'
+        });
+        if (!response.ok) {
+            if (response.status === 401) throw new Error('認証が必要です');
+            throw new Error('送信先一覧の取得に失敗しました');
+        }
+        return response.json();
+    },
+
+    async sendMessage(formData) {
+        const response = await fetch('/api/admin/messages/send', {
+            method: 'POST',
+            credentials: 'include',
+            body: formData
+        });
+        if (!response.ok) {
+            if (response.status === 401) throw new Error('認証が必要です');
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || 'メッセージ送信に失敗しました');
+        }
+        return response.json();
+    }
+};
+
+async function loadEvents() {
+    eventsListState.isLoading = true;
+    eventsListState.hasError = false;
+
+    try {
+        const data = await api.getEvents();
         eventsData = data.items;
         displayEvents(data.items);
     } catch (error) {
         console.error('イベント一覧取得エラー:', error);
-        showToast('イベント一覧の取得に失敗しました', 'error');
+        eventsListState.hasError = true;
+        eventsListState.errorMessage = error.message;
+        showToast(error.message, 'error');
+    } finally {
+        eventsListState.isLoading = false;
     }
 }
 
 function displayEvents(events) {
     const tbody = document.getElementById('events-tbody');
-    
+
     if (events.length === 0) {
         tbody.innerHTML = '<tr><td colspan="6" class="text-center">イベントがありません</td></tr>';
     } else {
         tbody.innerHTML = events.map(event => {
-            const heldAt = new Date(event.held_at).toLocaleString('ja-JP');
-            const createdAt = new Date(event.created_at).toLocaleString('ja-JP');
+            const heldAt = fmtDateTimeJp(event.held_at);
+            const deadlineAt = fmtDateTimeJp(event.deadline_at);
             return `
                 <tr>
                     <td>${event.id}</td>
                     <td>${event.title}</td>
                     <td>${heldAt}</td>
+                    <td>${deadlineAt}</td>
                     <td>${event.target_count || 0}名</td>
-                    <td>${createdAt}</td>
                     <td>
                         <button onclick="showEventDetail(${event.id})">詳細</button>
                     </td>
@@ -407,22 +510,7 @@ function displayEvents(events) {
     }
 }
 
-function filterEvents() {
-    const searchText = document.getElementById('event-search').value.toLowerCase();
-    const fromDate = document.getElementById('event-from').value;
-    const toDate = document.getElementById('event-to').value;
-    
-    const filtered = eventsData.filter(event => {
-        const matchesSearch = !searchText || event.title.toLowerCase().includes(searchText);
-        const eventDate = new Date(event.held_at);
-        const matchesFrom = !fromDate || eventDate >= new Date(fromDate);
-        const matchesTo = !toDate || eventDate <= new Date(toDate + 'T23:59:59');
-        
-        return matchesSearch && matchesFrom && matchesTo;
-    });
-    
-    displayEvents(filtered);
-}
+// filterEvents関数は検索機能削除に伴い廃止
 
 // イベント作成フォーム初期化
 async function loadEventForm() {
@@ -915,26 +1003,20 @@ function showEventDetail(eventId) {
 
 async function loadEventDetail() {
     if (!currentEventId) return;
-    
+
     const contentDiv = document.getElementById('event-detail-content');
     contentDiv.innerHTML = '読み込み中...';
-    
+
     try {
-        const response = await fetch(`/api/admin/events/${currentEventId}`, {
-            credentials: 'include'
-        });
-        
-        if (!response.ok) throw new Error('認証が必要です');
-        
-        const event = await response.json();
+        const event = await api.getEventDetail(currentEventId);
         
         // グローバルに保存（代理回答用）
         window.currentEventData = event;
         
         // 基本情報
         const basicInfoDiv = document.getElementById('event-basic-info');
-        const heldAt = new Date(event.held_at).toLocaleString('ja-JP');
-        const deadlineAt = event.deadline_at ? new Date(event.deadline_at).toLocaleDateString('ja-JP') : '未設定';
+        const heldAt = fmtDateTimeJp(event.held_at);
+        const deadlineAt = fmtDateTimeJp(event.deadline_at);
         basicInfoDiv.innerHTML = `
             <p><strong>タイトル:</strong> ${event.title}</p>
             <p><strong>開催日時:</strong> ${heldAt}</p>
@@ -1112,35 +1194,7 @@ async function proxyRespond(memberId, memberName, status) {
 }
 
 // CSV ダウンロード
-function downloadCSV(type) {
-    if (!currentEventId) return;
-    
-    const url = type === 'latest' 
-        ? `/api/admin/events/${currentEventId}/export/latest.csv`
-        : `/api/admin/events/${currentEventId}/export/history.csv`;
-    
-    fetch(url, { credentials: 'include' })
-        .then(response => {
-            if (!response.ok) throw new Error('ダウンロードに失敗しました');
-            return response.blob();
-        })
-        .then(blob => {
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = type === 'latest' 
-                ? `event_${currentEventId}_latest.csv`
-                : `event_${currentEventId}_history.csv`;
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
-            showToast('CSVをダウンロードしました', 'success');
-        })
-        .catch(error => {
-            showToast(`ダウンロードエラー: ${error.message}`, 'error');
-        });
-}
+// downloadCSV関数はCSV機能削除に伴い廃止
 
 // ========== Audience管理 ==========
 async function loadAudiences() {
@@ -1401,21 +1455,36 @@ async function loadMessageSendSection() {
     initMessageForm();
 }
 
+// メッセージ送信ボタンの状態更新
+function updateMessageSendButton() {
+    const btn = document.getElementById('send-message-btn');
+    if (!btn) return;
+
+    const canSend = messageState.audienceLoaded && !messageState.isSubmitting;
+    btn.disabled = !canSend;
+
+    if (messageState.isSubmitting) {
+        btn.innerHTML = '送信中...';
+    } else if (messageState.isLoading) {
+        btn.innerHTML = '読み込み中...';
+    } else {
+        btn.innerHTML = '送信 <span id="test-mode-badge" style="background:#e9ecef;color:#495057;padding:2px 6px;border-radius:999px;font-size:10px;margin-left:5px;display:none;">🧪テストモード</span>';
+    }
+}
+
 // audience一覧読み込み
 async function loadMessageAudiences() {
+    messageState.isLoading = true;
+    messageState.audienceLoaded = false;
+    updateMessageSendButton();
+
     try {
-        const response = await fetch('/api/admin/messages/audiences', {
-            credentials: 'include'
-        });
-        
-        if (!response.ok) throw new Error('audience取得に失敗しました');
-        
-        const data = await response.json();
+        const data = await api.getMessageAudiences();
         const select = document.getElementById('message-audience');
-        
+
         // 既存のオプションをクリア
         select.innerHTML = '';
-        
+
         // audienceを追加
         data.audiences.forEach(audience => {
             const option = document.createElement('option');
@@ -1423,15 +1492,20 @@ async function loadMessageAudiences() {
             option.textContent = `${audience.name}（${audience.member_count}名）`;
             select.appendChild(option);
         });
-        
+
         // デフォルト選択（sort_orderが最小のもの）
         if (data.audiences.length > 0) {
             select.value = data.audiences[0].id;
+            messageState.selectedAudienceId = data.audiences[0].id;
         }
-        
+
+        messageState.audienceLoaded = true;
     } catch (error) {
         console.error('audience読み込みエラー:', error);
-        showToast('audience一覧の取得に失敗しました', 'error');
+        showToast(error.message, 'error');
+    } finally {
+        messageState.isLoading = false;
+        updateMessageSendButton();
     }
 }
 
@@ -1493,6 +1567,9 @@ function initMessageForm() {
         e.preventDefault();
         await sendMessage();
     };
+
+    // 送信ボタンの初期状態設定
+    updateMessageSendButton();
 }
 
 // タブ切り替え
@@ -1535,7 +1612,7 @@ function handleImageUpload() {
     const reader = new FileReader();
     reader.onload = (e) => {
         previewImg.src = e.target.result;
-        imageInfo.textContent = `${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
+        imageInfo.textContent = `${truncateFileName(file.name, 50)} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
         preview.classList.remove('hidden');
     };
     reader.readAsDataURL(file);
@@ -1583,24 +1660,23 @@ async function sendMessage() {
         }
         
         try {
-            const submitBtn = document.getElementById('send-message-btn');
-            submitBtn.disabled = true;
-            submitBtn.textContent = '送信中...';
-            
-            const response = await fetch('/api/admin/messages/send', {
-                method: 'POST',
-                credentials: 'include',
-                body: formData
-            });
-            
-            const result = await response.json();
-            
+            messageState.isSubmitting = true;
+            updateMessageSendButton();
+
+            const result = await api.sendMessage(formData);
+
             if (result.success) {
-                const successMsg = result.fail_count > 0 
+                const successMsg = result.fail_count > 0
                     ? `送信完了（成功: ${result.success_count}名、失敗: ${result.fail_count}名）`
                     : `送信完了（${result.success_count}名）`;
                 showToast(successMsg, 'success');
-                
+
+                // dry-runバッジ表示制御
+                const badge = document.getElementById('test-mode-badge');
+                if (badge) {
+                    badge.style.display = result.dry_run ? 'inline-block' : 'none';
+                }
+
                 // フォームリセット
                 form.reset();
                 document.getElementById('image-preview').classList.add('hidden');
@@ -1609,14 +1685,13 @@ async function sendMessage() {
             } else {
                 showToast(result.error || '送信に失敗しました', 'error');
             }
-            
+
         } catch (error) {
             console.error('送信エラー:', error);
-            showToast('通信エラーが発生しました', 'error');
+            showToast(error.message || '通信エラーが発生しました', 'error');
         } finally {
-            const submitBtn = document.getElementById('send-message-btn');
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = `送信 <span id="test-mode-badge" style="background: orange; color: white; padding: 2px 6px; border-radius: 3px; font-size: 10px; margin-left: 5px; display: none;">🧪テストモード</span>`;
+            messageState.isSubmitting = false;
+            updateMessageSendButton();
         }
     });
 }

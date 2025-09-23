@@ -50,12 +50,21 @@
             margin-bottom: 20px;
         }
         
-        label { 
-            display: block; 
-            margin-bottom: 6px; 
+        label {
+            display: block;
+            margin-bottom: 6px;
             font-weight: 600;
             color: #555;
             font-size: 14px;
+        }
+
+        /* チェックボックス用のインライン表示 */
+        .checkbox-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            margin-bottom: 6px;
         }
         
         /* 入力フィールドの幅調整 */
@@ -720,7 +729,7 @@
                                     </div>
                                     <div id="image-preview" class="hidden" style="margin-top: 20px;">
                                         <img id="preview-img" style="max-width: 100%; max-height: 300px; border-radius: 6px;">
-                                        <p id="image-info" style="font-size: 12px; color: #666; margin-top: 10px;"></p>
+                                        <p id="image-info" style="font-size: 14px; color: #666; margin-top: 10px; line-height: 1.4; word-break: break-all; max-width: 500px;"></p>
                                     </div>
                                 </div>
                             </div>
@@ -789,7 +798,7 @@
                     </div>
                     
                     <div class="form-group">
-                        <label>
+                        <label class="checkbox-label">
                             <input type="checkbox" id="extra-text-enabled" name="extra_text_enabled">
                             追加メモ欄を有効にする
                         </label>
@@ -826,10 +835,8 @@
                 <!-- 検索・フィルター -->
                 <div class="d-flex gap-2" style="align-items: center; margin-bottom: 20px;">
                     <div class="search-box">
-                        <input type="text" id="event-search" placeholder="タイトルで検索..." onkeyup="filterEvents()">
+                        <!-- 検索機能は不要のため削除 -->
                     </div>
-                    <input type="date" id="event-from" class="input-small" onchange="filterEvents()" placeholder="開始日">
-                    <input type="date" id="event-to" class="input-small" onchange="filterEvents()" placeholder="終了日">
                     <button onclick="loadEvents()">読み込み</button>
                 </div>
                 
@@ -840,8 +847,8 @@
                                 <th class="sortable" onclick="sortTable('events-table', 0, 'number')">ID</th>
                                 <th class="sortable" onclick="sortTable('events-table', 1, 'text')">タイトル</th>
                                 <th class="sortable" onclick="sortTable('events-table', 2, 'date')">開催日時</th>
-                                <th class="sortable" onclick="sortTable('events-table', 3, 'number')">対象者数</th>
-                                <th class="sortable" onclick="sortTable('events-table', 4, 'date')">作成日時</th>
+                                <th class="sortable" onclick="sortTable('events-table', 3, 'date')">回答締切</th>
+                                <th class="sortable" onclick="sortTable('events-table', 4, 'number')">対象者数</th>
                                 <th>操作</th>
                             </tr>
                         </thead>
@@ -938,11 +945,7 @@
                     </div>
                 </div>
                 
-                <!-- CSV出力 -->
-                <div class="form-group">
-                    <h4>CSV出力</h4>
-                    <button onclick="downloadCSV('latest')" id="csv-latest-btn">最新状態をダウンロード</button>
-                </div>
+                <!-- CSV出力機能は不要のため削除 -->
             </div>
         </div>
     </div>

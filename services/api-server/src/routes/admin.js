@@ -475,7 +475,7 @@ router.get('/events', requireAuth, (req, res) => {
   const { from, to, query } = req.query;
   
   let sql = `
-    SELECT e.id, e.title, e.held_at, e.body, e.created_at,
+    SELECT e.id, e.title, e.held_at, e.deadline_at, e.body, e.created_at,
            e.extra_text_enabled, e.extra_text_label,
            e.image_url, e.image_preview_url,
            COUNT(et.member_id) as target_count
@@ -603,103 +603,9 @@ router.get('/events/:id', requireAuth, (req, res) => {
 });
 
 // CSV出力：最新状態
-router.get('/events/:id/export/latest.csv', requireAuth, (req, res) => {
-  const { id } = req.params;
-  
-  // イベント存在確認
-  const eventCheckSql = 'SELECT id FROM events WHERE id = ?';
-  
-  req.db.get(eventCheckSql, [id], (err, event) => {
-    if (err) {
-      console.error('イベント確認エラー:', err);
-      return res.status(500).json({ code: 'INTERNAL_ERROR', message: 'データベースエラー' });
-    }
-    
-    if (!event) {
-      return res.status(404).json({ code: 'EVENT_NOT_FOUND', message: 'イベントが見つかりません' });
-    }
-    
-    // 最新状態のCSV生成
-    const csvSql = `
-      SELECT et.member_id, m.name,
-             COALESCE(latest_response.status, 'pending') as status,
-             COALESCE(latest_response.extra_text, '') as extra_text,
-             COALESCE(latest_response.via, '') as via
-      FROM event_targets et
-      JOIN members m ON et.member_id = m.id
-      LEFT JOIN (
-        SELECT er.member_id, er.status, er.extra_text, er.via,
-               ROW_NUMBER() OVER (PARTITION BY er.member_id ORDER BY er.responded_at DESC) as rn
-        FROM event_responses er
-        WHERE er.event_id = ?
-      ) latest_response ON et.member_id = latest_response.member_id AND latest_response.rn = 1
-      WHERE et.event_id = ?
-      ORDER BY m.display_order, m.name ASC
-    `;
-    
-    req.db.all(csvSql, [id, id], (err, rows) => {
-      if (err) {
-        console.error('CSV生成エラー:', err);
-        return res.status(500).json({ code: 'INTERNAL_ERROR', message: 'CSVエラー' });
-      }
-      
-      // CSV文字列生成
-      const csvHeader = 'member_id,name,status,extra_text,via\n';
-      const csvData = rows.map(row => 
-        `${row.member_id},"${row.name.replace(/"/g, '""')}",${row.status},"${(row.extra_text || '').replace(/"/g, '""')}",${row.via}`
-      ).join('\n');
-      
-      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-      res.setHeader('Content-Disposition', `attachment; filename="event_${id}_latest.csv"`);
-      res.send('\ufeff' + csvHeader + csvData); // BOM付きUTF-8
-    });
-  });
-});
+// CSV出力エンドポイントは不要のため削除
 
-// CSV出力：回答履歴
-router.get('/events/:id/export/history.csv', requireAuth, (req, res) => {
-  const { id } = req.params;
-  
-  // イベント存在確認
-  const eventCheckSql = 'SELECT id FROM events WHERE id = ?';
-  
-  req.db.get(eventCheckSql, [id], (err, event) => {
-    if (err) {
-      console.error('イベント確認エラー:', err);
-      return res.status(500).json({ code: 'INTERNAL_ERROR', message: 'データベースエラー' });
-    }
-    
-    if (!event) {
-      return res.status(404).json({ code: 'EVENT_NOT_FOUND', message: 'イベントが見つかりません' });
-    }
-    
-    // 履歴のCSV生成
-    const csvSql = `
-      SELECT er.id as response_id, er.responded_at, er.member_id, m.name, er.status, er.extra_text, er.via
-      FROM event_responses er
-      JOIN members m ON er.member_id = m.id
-      WHERE er.event_id = ?
-      ORDER BY er.responded_at DESC
-    `;
-    
-    req.db.all(csvSql, [id], (err, rows) => {
-      if (err) {
-        console.error('CSV履歴生成エラー:', err);
-        return res.status(500).json({ code: 'INTERNAL_ERROR', message: 'CSVエラー' });
-      }
-      
-      // CSV文字列生成
-      const csvHeader = 'response_id,responded_at,member_id,name,status,extra_text,via\n';
-      const csvData = rows.map(row => 
-        `${row.response_id},${row.responded_at},${row.member_id},"${row.name.replace(/"/g, '""')}",${row.status},"${(row.extra_text || '').replace(/"/g, '""')}",${row.via}`
-      ).join('\n');
-      
-      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-      res.setHeader('Content-Disposition', `attachment; filename="event_${id}_history.csv"`);
-      res.send('\ufeff' + csvHeader + csvData); // BOM付きUTF-8
-    });
-  });
-});
+// CSV出力エンドポイントは不要のため削除
 
 // イベント作成（画像アップロード付き）
 router.post('/events', requireAuth, upload.single('image'), [
@@ -1354,7 +1260,8 @@ router.post('/messages/send', requireAuth, upload.single('image'), async (req, r
         message_log_id: this.lastID,
         recipient_count: targetUserIds.length,
         success_count: sendResult.success_count,
-        fail_count: sendResult.fail_count
+        fail_count: sendResult.fail_count,
+        dry_run: (process.env.DEV_PUSH_DISABLE === '1')
       });
     });
 
