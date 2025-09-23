@@ -260,7 +260,7 @@ router.get('/audiences', requireAuth, (req, res) => {
         message: 'データベースエラー'
       });
     }
-    res.json({ audiences: rows });
+    res.json({ items: rows });
   });
 });
 
