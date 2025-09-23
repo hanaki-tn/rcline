@@ -1,6 +1,8 @@
 
 # 基本設計（改訂版）
 
+**更新日**: 2025-09-20（LIFF統合改善及び暫定対応を反映）
+
 ## 1. 前提（目的・範囲・役割・方針）
 
 ### 1.1 目的
@@ -492,9 +494,11 @@ docker compose exec redis redis-cli KEYS "*"
 * フロントエンド：バニラJavaScript + 共通CSS/JSライブラリ
 * ファイル構成：
   * `common.css`：共通スタイル（レスポンシブ対応）
-  * `common.js`：共通関数（API通信、認証、ユーティリティ）
-  * `index.html`：イベント一覧画面
-  * `detail.html`：イベント詳細画面
+  * `common.js`：共通関数（新LIFF ID、セッションキャッシュ機能追加）
+  * `old_common.js`：旧共通関数（旧LIFF ID、廃止予定）
+  * `events.html`：イベント一覧・詳細画面（SPA版、新）
+  * `index.html`：イベント一覧画面（旧、廃止予定）
+  * `detail.html`：イベント詳細画面（旧、廃止予定）
   * `register.html`：セルフ登録画面
 
 **表示仕様**:
@@ -506,7 +510,9 @@ docker compose exec redis redis-cli KEYS "*"
 
 ### 2.3 L-LIST（イベント一覧）
 
-**URL**: `/liff/index.html`
+**URL**:
+- 旧：`/liff/index.html`（廃止予定）
+- 新：`/liff/events.html`（SPA版）
 
 **機能**:
 * 表示条件：**自分が対象となっているイベント、または自分が作成したイベント**
@@ -533,7 +539,9 @@ docker compose exec redis redis-cli KEYS "*"
 
 ### 2.4 L-DETAIL（イベント詳細）
 
-**URL**: `/liff/detail.html?id={event_id}`
+**URL**:
+- 旧：`/liff/detail.html?id={event_id}`（廃止予定）
+- 新：`/liff/events.html?view=detail&id={event_id}`（SPA版）
 
 **レイウト順序**（カード形式）:
 1. **タイトル** (`event.title`)
@@ -605,7 +613,7 @@ docker compose exec redis redis-cli KEYS "*"
 
 **画面遷移**:
 * 登録成功時：
-  - URLパラメータ`from=events`がある場合 → `index.html`へ遷移
+  - URLパラメータ`from=events`がある場合 → `events.html`へ遷移（旧：index.html）
   - パラメータがない場合 → `liff.closeWindow()`でLINEチャット画面へ
 * スキップ時：`liff.closeWindow()`でLINEチャット画面へ
 * 登録失敗時：エラーメッセージ表示後、画面に留まる
@@ -1575,7 +1583,13 @@ ORDER BY (SELECT display_order FROM members m WHERE m.id = et.member_id) ASC NUL
 * 参照：**CLIで取得**（list/pull）。画面UIは無し。
 * 画面は `event_push_stats` のみ使用（A-EVENT-DETAILで要約表示）。
 
-### 5.3 VPS環境構成（実装記録より）
+### 5.3 LIFF ID管理（2025-09-20追加）
+
+* **新LIFF ID**: `2007866921-kw3W8dBv`（events.html用、移行中）
+* **旧LIFF ID**: `2007866921-LkR3yg4k`（index.html/detail.html用、廃止予定）
+* **暫定対応**：旧LIFF IDでの認証エラー時に「システムメンテナンス中」表示
+
+### 5.4 VPS環境構成（実装記録より）
 
 #### 5.3.1 配置とURL構成
 * **パス**：`/opt/rcline/`

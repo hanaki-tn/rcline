@@ -1297,15 +1297,18 @@ router.post('/messages/send', requireAuth, upload.single('image'), async (req, r
   try {
     // message-sender.jsをインポート
     const { sendTextMessage, sendImageMessage, buildMessageTargets } = await import('../line/message-sender.js');
-    
-    // 送信対象リスト作成
-    const targetUserIds = await buildMessageTargets(
+
+    // 送信対象リスト作成（userIdsとmemberIdsの両方を取得）
+    const targetData = await buildMessageTargets(
       parseInt(audience_id),
       include_sender === 'true',
       req.session.adminUser.id,
       req.db
     );
-    
+
+    const targetUserIds = targetData.userIds;
+    const targetMemberIds = targetData.memberIds;
+
     if (targetUserIds.length === 0) {
       return res.status(400).json({
         success: false,
@@ -1353,50 +1356,94 @@ router.post('/messages/send', requireAuth, upload.single('image'), async (req, r
       sendResult = await sendImageMessage(targetUserIds, imageUrl, imagePreviewUrl);
     }
 
-    // 送信ログ記録
-    const logSql = `
-      INSERT INTO message_logs (
-        type, message_text, image_url, image_preview_url, image_size, image_preview_size,
-        audience_id, recipient_count, sent_by_admin, sent_at, success_count, fail_count,
-        created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `;
-    
+    // トランザクション開始して送信ログと受信者を記録
     const now = nowJST();
-    
-    req.db.run(logSql, [
-      type,
-      type === 'text' ? message_text.trim() : null,
-      imageUrl,
-      imagePreviewUrl,
-      imageSize,
-      imagePreviewSize,
-      parseInt(audience_id),
-      targetUserIds.length,
-      req.session.adminUser.id,
-      now,
-      sendResult.success_count,
-      sendResult.fail_count,
-      now,
-      now
-    ], function(err) {
-      if (err) {
-        console.error('メッセージログ保存エラー:', err);
-        return res.status(500).json({
-          success: false,
-          error: 'ログ保存に失敗しました'
+
+    // トランザクション開始
+    await new Promise((resolve, reject) => {
+      req.db.run('BEGIN TRANSACTION', err => err ? reject(err) : resolve());
+    });
+
+    try {
+      // 送信ログ記録
+      const logSql = `
+        INSERT INTO message_logs (
+          type, message_text, image_url, image_preview_url, image_size, image_preview_size,
+          audience_id, recipient_count, sent_by_admin, sent_at, success_count, fail_count,
+          created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+
+      const messageLogId = await new Promise((resolve, reject) => {
+        req.db.run(logSql, [
+          type,
+          type === 'text' ? message_text.trim() : null,
+          imageUrl,
+          imagePreviewUrl,
+          imageSize,
+          imagePreviewSize,
+          parseInt(audience_id),
+          targetUserIds.length,
+          req.session.adminUser.id,
+          now,
+          sendResult.success_count,
+          sendResult.fail_count,
+          now,
+          now
+        ], function(err) {
+          if (err) {
+            reject(err);
+          } else {
+            resolve(this.lastID);
+          }
         });
+      });
+
+      // 受信者情報を保存
+      if (targetMemberIds.length > 0) {
+        const recipientSql = `
+          INSERT INTO message_log_recipients (message_log_id, member_id, created_at)
+          VALUES (?, ?, ?)
+        `;
+
+        const insertPromises = targetMemberIds.map(memberId => {
+          return new Promise((resolve, reject) => {
+            req.db.run(recipientSql, [messageLogId, memberId, now], err => {
+              if (err) reject(err);
+              else resolve();
+            });
+          });
+        });
+
+        await Promise.all(insertPromises);
       }
-      
+
+      // コミット
+      await new Promise((resolve, reject) => {
+        req.db.run('COMMIT', err => err ? reject(err) : resolve());
+      });
+
       res.json({
         success: true,
-        message_log_id: this.lastID,
+        message_log_id: messageLogId,
         recipient_count: targetUserIds.length,
         success_count: sendResult.success_count,
         fail_count: sendResult.fail_count,
         dry_run: (process.env.DEV_PUSH_DISABLE === '1')
       });
-    });
+
+    } catch (err) {
+      // ロールバック
+      await new Promise((resolve) => {
+        req.db.run('ROLLBACK', () => resolve());
+      });
+
+      console.error('メッセージログ保存エラー:', err);
+      return res.status(500).json({
+        success: false,
+        error: 'ログ保存に失敗しました'
+      });
+    }
 
   } catch (error) {
     console.error('メッセージ送信エラー:', error);
@@ -1405,6 +1452,118 @@ router.post('/messages/send', requireAuth, upload.single('image'), async (req, r
       error: 'メッセージ送信に失敗しました'
     });
   }
+});
+
+// ===== MESSAGE HISTORY API =====
+
+// メッセージ送信履歴取得
+router.get('/messages', requireAuth, (req, res) => {
+  const { limit = 50, offset = 0 } = req.query;
+
+  const sql = `
+    SELECT
+      ml.id,
+      ml.type,
+      ml.message_text,
+      ml.image_url,
+      ml.image_preview_url,
+      ml.audience_id,
+      a.name as audience_name,
+      ml.recipient_count,
+      ml.sent_by_admin,
+      au.username as sent_by_username,
+      ml.sent_at,
+      ml.success_count,
+      ml.fail_count,
+      ml.created_at,
+      ml.updated_at,
+      (
+        SELECT COUNT(DISTINCT member_id)
+        FROM message_log_recipients
+        WHERE message_log_id = ml.id
+      ) as actual_recipient_count
+    FROM message_logs ml
+    LEFT JOIN audiences a ON ml.audience_id = a.id
+    LEFT JOIN admin_users au ON ml.sent_by_admin = au.id
+    ORDER BY ml.created_at DESC
+    LIMIT ? OFFSET ?
+  `;
+
+  req.db.all(sql, [parseInt(limit), parseInt(offset)], (err, rows) => {
+    if (err) {
+      console.error('メッセージ履歴取得エラー:', err);
+      return res.status(500).json({ error: '履歴取得に失敗しました' });
+    }
+
+    // 総件数取得
+    req.db.get('SELECT COUNT(*) as total FROM message_logs', (err, countResult) => {
+      if (err) {
+        console.error('総件数取得エラー:', err);
+        return res.status(500).json({ error: '履歴取得に失敗しました' });
+      }
+
+      res.json({
+        items: rows,
+        total: countResult.total,
+        limit: parseInt(limit),
+        offset: parseInt(offset)
+      });
+    });
+  });
+});
+
+// メッセージ送信履歴の受信者詳細取得
+router.get('/messages/:id/recipients', requireAuth, (req, res) => {
+  const { id } = req.params;
+
+  const sql = `
+    SELECT
+      mlr.member_id,
+      m.name,
+      m.student_id,
+      m.line_user_id,
+      mlr.created_at
+    FROM message_log_recipients mlr
+    JOIN members m ON mlr.member_id = m.id
+    WHERE mlr.message_log_id = ?
+    ORDER BY m.display_order, m.id
+  `;
+
+  req.db.all(sql, [id], (err, recipients) => {
+    if (err) {
+      console.error('受信者詳細取得エラー:', err);
+      return res.status(500).json({ error: '受信者情報の取得に失敗しました' });
+    }
+
+    // メッセージログ情報も取得
+    const logSql = `
+      SELECT
+        ml.*,
+        a.name as audience_name,
+        au.username as sent_by_username
+      FROM message_logs ml
+      LEFT JOIN audiences a ON ml.audience_id = a.id
+      LEFT JOIN admin_users au ON ml.sent_by_admin = au.id
+      WHERE ml.id = ?
+    `;
+
+    req.db.get(logSql, [id], (err, messageLog) => {
+      if (err) {
+        console.error('メッセージログ取得エラー:', err);
+        return res.status(500).json({ error: 'メッセージ情報の取得に失敗しました' });
+      }
+
+      if (!messageLog) {
+        return res.status(404).json({ error: 'メッセージが見つかりません' });
+      }
+
+      res.json({
+        message_log: messageLog,
+        recipients: recipients,
+        total_count: recipients.length
+      });
+    });
+  });
 });
 
 export { router as adminRoutes, requireAuth };

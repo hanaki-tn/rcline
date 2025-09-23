@@ -57,34 +57,35 @@ export async function sendImageMessage(userIds, imageUrl, previewUrl) {
  * @param {boolean} includeSender - 送信者を含むかどうか
  * @param {number} adminUserId - 管理者ユーザーのID
  * @param {object} db - データベース接続
- * @returns {Promise<Array<string>>}
+ * @returns {Promise<{userIds: Array<string>, memberIds: Array<number>}>}
  */
 export async function buildMessageTargets(audienceId, includeSender, adminUserId, db) {
   return new Promise((resolve, reject) => {
     // audienceのメンバー取得
     const audienceSql = `
-      SELECT m.line_user_id
+      SELECT m.id as member_id, m.line_user_id
       FROM audience_members am
       JOIN members m ON am.member_id = m.id
       WHERE am.audience_id = ? AND m.line_user_id IS NOT NULL
     `;
-    
+
     db.all(audienceSql, [audienceId], (err, audienceMembers) => {
       if (err) {
         return reject(err);
       }
 
       let targetUserIds = audienceMembers.map(member => member.line_user_id);
+      let targetMemberIds = audienceMembers.map(member => member.member_id);
 
       if (includeSender) {
         // 送信者のline_user_id取得
         const adminSql = `
-          SELECT m.line_user_id
+          SELECT m.id as member_id, m.line_user_id
           FROM admin_users au
           JOIN members m ON au.member_id = m.id
           WHERE au.id = ? AND m.line_user_id IS NOT NULL
         `;
-        
+
         db.get(adminSql, [adminUserId], (err, admin) => {
           if (err) {
             return reject(err);
@@ -94,13 +95,14 @@ export async function buildMessageTargets(audienceId, includeSender, adminUserId
             // 重複排除
             if (!targetUserIds.includes(admin.line_user_id)) {
               targetUserIds.push(admin.line_user_id);
+              targetMemberIds.push(admin.member_id);
             }
           }
 
-          resolve(targetUserIds);
+          resolve({ userIds: targetUserIds, memberIds: targetMemberIds });
         });
       } else {
-        resolve(targetUserIds);
+        resolve({ userIds: targetUserIds, memberIds: targetMemberIds });
       }
     });
   });

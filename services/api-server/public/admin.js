@@ -245,6 +245,10 @@ function showSection(section, skipHistory = false) {
         case 'message-send':
             loadMessageSendSection();
             break;
+        case 'message-history':
+            messageHistoryOffset = 0;
+            loadMessageHistory();
+            break;
         case 'audience-manage':
             showAudienceList();
             break;
@@ -2096,3 +2100,212 @@ window.addEventListener('pageshow', function(event) {
         }
     }
 });
+
+// ===== メッセージ履歴機能 =====
+
+let messageHistoryOffset = 0;
+const messageHistoryLimit = 20;
+
+// メッセージ履歴の読み込み
+async function loadMessageHistory() {
+    try {
+        const response = await fetch(`/api/admin/messages?limit=${messageHistoryLimit}&offset=${messageHistoryOffset}`, {
+            credentials: 'include'
+        });
+
+        if (!response.ok) throw new Error('履歴取得失敗');
+
+        const data = await response.json();
+        displayMessageHistory(data.items);
+        displayMessagePagination(data.total);
+    } catch (error) {
+        console.error('メッセージ履歴取得エラー:', error);
+        showToast('履歴の取得に失敗しました', 'error');
+    }
+}
+
+// メッセージ履歴の表示
+function displayMessageHistory(messages) {
+    const tbody = document.getElementById('message-history-body');
+    tbody.innerHTML = '';
+
+    if (messages.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #666;">送信履歴がありません</td></tr>';
+        return;
+    }
+
+    messages.forEach(msg => {
+        const row = tbody.insertRow();
+
+        // 送信日時
+        const sentAt = new Date(msg.sent_at);
+        const sentAtStr = sentAt.toLocaleString('ja-JP', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+        row.insertCell().textContent = sentAtStr;
+
+        // 種別
+        const typeCell = row.insertCell();
+        if (msg.type === 'text') {
+            typeCell.innerHTML = '<span style="color: #28a745;">📝 テキスト</span>';
+        } else if (msg.type === 'image') {
+            typeCell.innerHTML = '<span style="color: #17a2b8;">🖼️ 画像</span>';
+        } else {
+            typeCell.textContent = msg.type;
+        }
+
+        // 送信先
+        row.insertCell().textContent = msg.audience_name || 'グループ削除済み';
+
+        // 送信人数
+        const countCell = row.insertCell();
+        const actualCount = msg.actual_recipient_count || 0;
+        const recordedCount = msg.recipient_count || 0;
+
+        if (actualCount > 0) {
+            countCell.textContent = `${actualCount}名`;
+        } else if (recordedCount > 0) {
+            countCell.innerHTML = `<span style="color: #999;">${recordedCount}名（詳細なし）</span>`;
+        } else {
+            countCell.textContent = '0名';
+        }
+
+        // 成功/失敗
+        const statusCell = row.insertCell();
+        const successCount = msg.success_count || 0;
+        const failCount = msg.fail_count || 0;
+
+        if (failCount === 0) {
+            statusCell.innerHTML = `<span style="color: green;">✓ ${successCount}</span>`;
+        } else if (successCount === 0) {
+            statusCell.innerHTML = `<span style="color: red;">✗ ${failCount}</span>`;
+        } else {
+            statusCell.innerHTML = `<span style="color: green;">✓ ${successCount}</span> / <span style="color: red;">✗ ${failCount}</span>`;
+        }
+
+        // 送信者
+        row.insertCell().textContent = msg.sent_by_username || '不明';
+
+        // 操作
+        const actionCell = row.insertCell();
+        if (actualCount > 0) {
+            actionCell.innerHTML = `<button onclick="showRecipientDetails(${msg.id})" class="btn-small">詳細</button>`;
+        } else {
+            actionCell.innerHTML = '<span style="color: #999;">-</span>';
+        }
+    });
+}
+
+// ページネーション表示
+function displayMessagePagination(total) {
+    const paginationDiv = document.getElementById('message-pagination');
+    paginationDiv.innerHTML = '';
+
+    const totalPages = Math.ceil(total / messageHistoryLimit);
+    const currentPage = Math.floor(messageHistoryOffset / messageHistoryLimit) + 1;
+
+    if (totalPages <= 1) return;
+
+    // 前へボタン
+    if (currentPage > 1) {
+        const prevBtn = document.createElement('button');
+        prevBtn.textContent = '< 前へ';
+        prevBtn.onclick = () => {
+            messageHistoryOffset -= messageHistoryLimit;
+            loadMessageHistory();
+        };
+        paginationDiv.appendChild(prevBtn);
+    }
+
+    // ページ番号
+    const pageInfo = document.createElement('span');
+    pageInfo.style.margin = '0 15px';
+    pageInfo.textContent = `${currentPage} / ${totalPages}`;
+    paginationDiv.appendChild(pageInfo);
+
+    // 次へボタン
+    if (currentPage < totalPages) {
+        const nextBtn = document.createElement('button');
+        nextBtn.textContent = '次へ >';
+        nextBtn.onclick = () => {
+            messageHistoryOffset += messageHistoryLimit;
+            loadMessageHistory();
+        };
+        paginationDiv.appendChild(nextBtn);
+    }
+}
+
+// 受信者詳細表示
+async function showRecipientDetails(messageLogId) {
+    try {
+        const response = await fetch(`/api/admin/messages/${messageLogId}/recipients`, {
+            credentials: 'include'
+        });
+
+        if (!response.ok) throw new Error('受信者情報取得失敗');
+
+        const data = await response.json();
+
+        // モーダルに情報を設定
+        const log = data.message_log;
+        const recipients = data.recipients;
+
+        // 送信情報
+        const sentAt = new Date(log.sent_at);
+        document.getElementById('modal-sent-at').textContent = sentAt.toLocaleString('ja-JP');
+        document.getElementById('modal-audience').textContent = log.audience_name || 'グループ削除済み';
+        document.getElementById('modal-sender').textContent = log.sent_by_username || '不明';
+        document.getElementById('modal-type').textContent = log.type === 'text' ? 'テキスト' : '画像';
+
+        // メッセージ内容
+        const contentDiv = document.getElementById('modal-message-content');
+        if (log.type === 'text') {
+            contentDiv.innerHTML = `<pre style="margin: 0; white-space: pre-wrap; word-wrap: break-word;">${escapeHtml(log.message_text)}</pre>`;
+        } else if (log.type === 'image') {
+            contentDiv.innerHTML = `<img src="${log.image_preview_url || log.image_url}" style="max-width: 100%; max-height: 200px;">`;
+        }
+
+        // 受信者一覧
+        document.getElementById('recipients-count').textContent = recipients.length;
+        const tbody = document.getElementById('recipients-body');
+        tbody.innerHTML = '';
+
+        recipients.forEach(recipient => {
+            const row = tbody.insertRow();
+            row.insertCell().textContent = recipient.name;
+            row.insertCell().textContent = recipient.student_id || '-';
+
+            const lineCell = row.insertCell();
+            if (recipient.line_user_id) {
+                lineCell.innerHTML = '<span style="color: green;">✓ 連携済み</span>';
+            } else {
+                lineCell.innerHTML = '<span style="color: #999;">未連携</span>';
+            }
+        });
+
+        // モーダル表示
+        document.getElementById('recipients-modal').classList.remove('hidden');
+        document.getElementById('recipients-modal').classList.add('active');
+
+    } catch (error) {
+        console.error('受信者詳細取得エラー:', error);
+        showToast('受信者情報の取得に失敗しました', 'error');
+    }
+}
+
+// 受信者詳細モーダルを閉じる
+function closeRecipientsModal() {
+    document.getElementById('recipients-modal').classList.remove('active');
+    document.getElementById('recipients-modal').classList.add('hidden');
+}
+
+// HTMLエスケープ関数
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
