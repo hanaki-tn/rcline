@@ -433,44 +433,80 @@ router.delete('/audiences/:id', requireAuth, async (req, res) => {
   const { id } = req.params;
   const now = nowJST();
 
+  console.log(`[INFO] グループ削除開始: audienceId=${id}, now=${now}`);
+
   try {
     // トランザクション開始
+    console.log('[INFO] トランザクション開始');
     await new Promise((resolve, reject) => {
       req.db.run('BEGIN TRANSACTION', err => err ? reject(err) : resolve());
     });
 
     // メンバー紐付けを物理削除
+    console.log('[INFO] audience_members削除実行');
     await new Promise((resolve, reject) => {
       req.db.run(
         'DELETE FROM audience_members WHERE audience_id = ?',
         [id],
-        err => err ? reject(err) : resolve()
+        function(err) {
+          if (err) {
+            console.error('[ERROR] audience_members削除エラー:', err);
+            reject(err);
+          } else {
+            console.log(`[INFO] audience_members削除完了: ${this.changes}件削除`);
+            resolve();
+          }
+        }
       );
     });
 
     // グループをソフトデリート（履歴保持のため）
+    console.log('[INFO] audiences更新実行');
     await new Promise((resolve, reject) => {
       req.db.run(
         'UPDATE audiences SET del_flg = 1, deleted_at = ? WHERE id = ? AND del_flg = 0',
         [now, id],
         function(err) {
-          if (err) reject(err);
-          else if (this.changes === 0) reject(new Error('グループが見つかりません'));
-          else resolve();
+          if (err) {
+            console.error('[ERROR] audiences更新エラー:', err);
+            reject(err);
+          } else if (this.changes === 0) {
+            console.error('[ERROR] audiences更新対象なし: グループが見つかりません');
+            reject(new Error('グループが見つかりません'));
+          } else {
+            console.log(`[INFO] audiences更新完了: ${this.changes}件更新`);
+            resolve();
+          }
         }
       );
     });
 
     // コミット
+    console.log('[INFO] コミット実行');
     await new Promise((resolve, reject) => {
-      req.db.run('COMMIT', err => err ? reject(err) : resolve());
+      req.db.run('COMMIT', err => {
+        if (err) {
+          console.error('[ERROR] コミットエラー:', err);
+          reject(err);
+        } else {
+          console.log('[INFO] コミット完了');
+          resolve();
+        }
+      });
     });
 
+    console.log('[INFO] グループ削除正常終了');
     res.status(204).send();
   } catch (error) {
     // ロールバック
-    req.db.run('ROLLBACK');
-    console.error('グループ削除エラー:', error);
+    console.error('[ERROR] グループ削除エラー - ロールバック実行:', error);
+    req.db.run('ROLLBACK', (rollbackErr) => {
+      if (rollbackErr) {
+        console.error('[ERROR] ロールバックエラー:', rollbackErr);
+      } else {
+        console.log('[INFO] ロールバック完了');
+      }
+    });
     return res.status(500).json({ error: 'グループの削除に失敗しました' });
   }
 });
