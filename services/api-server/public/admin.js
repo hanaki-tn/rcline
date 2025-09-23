@@ -2296,13 +2296,6 @@ async function showRecipientDetails(messageLogId) {
         recipients.forEach(recipient => {
             const row = tbody.insertRow();
             row.insertCell().textContent = recipient.name;
-
-            const lineCell = row.insertCell();
-            if (recipient.line_user_id) {
-                lineCell.innerHTML = '<span style="color: green;">✓ 連携済み</span>';
-            } else {
-                lineCell.innerHTML = '<span style="color: #999;">未連携</span>';
-            }
         });
 
         // モーダル表示
