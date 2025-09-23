@@ -235,63 +235,141 @@ router.get('/members', requireAuth, (req, res) => {
   });
 });
 
-// audiences一覧 - フェーズ1-3
+// audiences一覧 - フェーズ1-3（メンバー数含む）
 router.get('/audiences', requireAuth, (req, res) => {
-  req.db.all(
-    'SELECT id, name, sort_order, created_at, updated_at FROM audiences WHERE del_flg = 0 ORDER BY sort_order, name ASC',
-    (err, rows) => {
-      if (err) {
-        console.error('audiences一覧取得エラー:', err);
-        return res.status(500).json({
-          code: 'INTERNAL_ERROR',
-          message: 'データベースエラー'
-        });
-      }
-      res.json({ items: rows });
+  const sql = `
+    SELECT
+      a.id,
+      a.name,
+      a.sort_order,
+      a.created_at,
+      a.updated_at,
+      COUNT(am.member_id) as member_count
+    FROM audiences a
+    LEFT JOIN audience_members am ON a.id = am.audience_id
+    WHERE a.del_flg = 0
+    GROUP BY a.id
+    ORDER BY a.sort_order, a.name ASC
+  `;
+
+  req.db.all(sql, [], (err, rows) => {
+    if (err) {
+      console.error('audiences一覧取得エラー:', err);
+      return res.status(500).json({
+        code: 'INTERNAL_ERROR',
+        message: 'データベースエラー'
+      });
     }
-  );
+    res.json({ audiences: rows });
+  });
 });
 
-// audience作成
+// audience作成（重複チェック追加）
 router.post('/audiences', requireAuth, [
   body('name').trim().isLength({ min: 1, max: 100 }).withMessage('名前は1-100文字で入力してください'),
   body('sort_order').optional().isInt({ min: 0 }).withMessage('ソート順は0以上の整数にしてください')
-], (req, res) => {
+], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({
-      code: 'INVALID_INPUT',
-      message: '入力エラー',
-      details: errors.array()
+      error: errors.array()[0].msg
     });
   }
 
   const { name, sort_order } = req.body;
   const now = nowJST();
 
-  req.db.run(
-    'INSERT INTO audiences (name, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?)',
-    [name, sort_order || null, now, now],
-    function(err) {
-      if (err) {
-        if (err.code === 'SQLITE_CONSTRAINT') {
-          return res.status(409).json({
-            code: 'DUPLICATE_NAME',
-            message: 'この名前は既に使用されています'
-          });
+  try {
+    // 同名グループの重複チェック
+    const existing = await new Promise((resolve, reject) => {
+      req.db.get(
+        'SELECT id FROM audiences WHERE name = ? AND del_flg = 0',
+        [name],
+        (err, row) => {
+          if (err) reject(err);
+          else resolve(row);
         }
-        console.error('audience作成エラー:', err);
-        return res.status(500).json({
-          code: 'INTERNAL_ERROR',
-          message: 'データベースエラー'
-        });
-      }
-      res.status(201).json({ id: this.lastID });
+      );
+    });
+
+    if (existing) {
+      return res.status(400).json({ error: '同名のグループが既に存在します' });
     }
-  );
+
+    // 作成処理
+    req.db.run(
+      'INSERT INTO audiences (name, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?)',
+      [name, sort_order || null, now, now],
+      function(err) {
+        if (err) {
+          console.error('audience作成エラー:', err);
+          return res.status(500).json({ error: 'グループの作成に失敗しました' });
+        }
+        res.status(201).json({ audience_id: this.lastID });
+      }
+    );
+  } catch (error) {
+    console.error('audience作成エラー:', error);
+    return res.status(500).json({ error: 'グループの作成に失敗しました' });
+  }
 });
 
-// audience更新
+// PUT /api/admin/audiences/:id - Audience基本情報更新（新規追加）
+router.put('/audiences/:id', requireAuth, [
+  body('name').isString().notEmpty().withMessage('グループ名は必須'),
+  body('sort_order').isInt({ min: 0 }).withMessage('表示順は0以上の整数')
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ error: errors.array()[0].msg });
+  }
+
+  const { id } = req.params;
+  const { name, sort_order } = req.body;
+
+  try {
+    // 同名グループの重複チェック
+    const existing = await new Promise((resolve, reject) => {
+      req.db.get(
+        'SELECT id FROM audiences WHERE name = ? AND id != ? AND del_flg = 0',
+        [name, id],
+        (err, row) => {
+          if (err) reject(err);
+          else resolve(row);
+        }
+      );
+    });
+
+    if (existing) {
+      return res.status(400).json({ error: '同名のグループが既に存在します' });
+    }
+
+    // 更新処理
+    const updateSql = `
+      UPDATE audiences
+      SET name = ?, sort_order = ?, updated_at = datetime('now')
+      WHERE id = ? AND del_flg = 0
+    `;
+
+    req.db.run(updateSql, [name, sort_order, id], function(err) {
+      if (err) {
+        console.error('Audience更新エラー:', err);
+        return res.status(500).json({ error: 'グループの更新に失敗しました' });
+      }
+
+      if (this.changes === 0) {
+        return res.status(404).json({ error: 'グループが見つかりません' });
+      }
+
+      res.json({ success: true, message: 'グループを更新しました' });
+    });
+  } catch (error) {
+    console.error('Audience更新エラー:', error);
+    return res.status(500).json({ error: 'グループの更新に失敗しました' });
+  }
+});
+
+// audience更新（既存PATCH - 後方互換性のため維持）
 router.patch('/audiences/:id', requireAuth, [
   body('name').optional().trim().isLength({ min: 1, max: 100 }).withMessage('名前は1-100文字で入力してください'),
   body('sort_order').optional().isInt({ min: 0 }).withMessage('ソート順は0以上の整数にしてください')
@@ -350,32 +428,51 @@ router.patch('/audiences/:id', requireAuth, [
   });
 });
 
-// audience削除（ソフトデリート）
-router.delete('/audiences/:id', requireAuth, (req, res) => {
+// audience削除（メンバー紐付けも物理削除）
+router.delete('/audiences/:id', requireAuth, async (req, res) => {
   const { id } = req.params;
-
   const now = nowJST();
 
-  req.db.run('UPDATE audiences SET del_flg = 1, deleted_at = ? WHERE id = ? AND del_flg = 0', [now, id], function(err) {
-    if (err) {
-      console.error('audience削除エラー:', err);
-      return res.status(500).json({
-        code: 'INTERNAL_ERROR',
-        message: 'データベースエラー',
-        details: err.message
-      });
-    }
+  try {
+    // トランザクション開始
+    await new Promise((resolve, reject) => {
+      req.db.run('BEGIN TRANSACTION', err => err ? reject(err) : resolve());
+    });
 
-    if (this.changes === 0) {
-      return res.status(404).json({
-        code: 'NOT_FOUND',
-        message: 'audienceが見つかりません（存在しないか既に削除済みです）'
-      });
-    }
+    // メンバー紐付けを物理削除
+    await new Promise((resolve, reject) => {
+      req.db.run(
+        'DELETE FROM audience_members WHERE audience_id = ?',
+        [id],
+        err => err ? reject(err) : resolve()
+      );
+    });
 
-    console.log(`audience ${id} を削除しました (影響行数: ${this.changes})`);
+    // グループをソフトデリート（履歴保持のため）
+    await new Promise((resolve, reject) => {
+      req.db.run(
+        'UPDATE audiences SET del_flg = 1, deleted_at = ? WHERE id = ? AND del_flg = 0',
+        [now, id],
+        function(err) {
+          if (err) reject(err);
+          else if (this.changes === 0) reject(new Error('グループが見つかりません'));
+          else resolve();
+        }
+      );
+    });
+
+    // コミット
+    await new Promise((resolve, reject) => {
+      req.db.run('COMMIT', err => err ? reject(err) : resolve());
+    });
+
     res.status(204).send();
-  });
+  } catch (error) {
+    // ロールバック
+    req.db.run('ROLLBACK');
+    console.error('グループ削除エラー:', error);
+    return res.status(500).json({ error: 'グループの削除に失敗しました' });
+  }
 });
 
 // audience所属メンバー取得

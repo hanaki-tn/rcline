@@ -682,8 +682,7 @@
                 <button onclick="showSection('message-send')">メッセージ送信</button>
                 <button onclick="showSection('event-new')">イベント作成</button>
                 <button onclick="showSection('event-list')">イベント一覧</button>
-                <button onclick="showSection('audience-new')" class="maintenance">送信グループ作成</button>
-                <button onclick="showSection('audience-list')" class="maintenance">送信グループ一覧</button>
+                <button onclick="showSection('audience-manage')" class="maintenance">送信グループ管理</button>
                 <button onclick="showSection('members')" class="maintenance">会員一覧</button>
                 <button onclick="confirmAction('ログアウトしますか？', logout)" class="logout">ログアウト</button>
             </div>
@@ -857,40 +856,81 @@
                 </div>
             </div>
 
-            <!-- 送信グループ作成セクション -->
-            <div id="audience-new-section" class="card hidden">
-                <h3>送信グループ作成</h3>
-                <div class="form-group">
-                    <label for="audience-name">グループ名:</label>
-                    <input type="text" id="audience-name" class="input-medium" placeholder="例: 理事会">
-                </div>
-                <div class="form-group">
-                    <label for="audience-sort">表示順:</label>
-                    <input type="number" id="audience-sort" class="input-tiny" placeholder="1" required>
-                </div>
-                <button onclick="createAudience()">作成</button>
-                <div id="audience-message" class="mt-3"></div>
-            </div>
+            <!-- 送信グループ管理セクション -->
+            <div id="audience-manage-section" class="card hidden">
+                <h3>送信グループ管理</h3>
 
-            <!-- 送信グループ一覧セクション -->
-            <div id="audience-list-section" class="card hidden">
-                <h3>送信グループ一覧</h3>
-                
-                <div class="table-container">
-                    <table id="audiences-table">
-                        <thead>
-                            <tr>
-                                <th class="sortable" onclick="sortTable('audiences-table', 0, 'number')">ID</th>
-                                <th class="sortable" onclick="sortTable('audiences-table', 1, 'text')">グループ名</th>
-                                <th class="sortable" onclick="sortTable('audiences-table', 2, 'number')">表示順</th>
-                                <th class="sortable" onclick="sortTable('audiences-table', 3, 'date')">作成日時</th>
-                                <th>操作</th>
-                            </tr>
-                        </thead>
-                        <tbody id="audiences-tbody"></tbody>
-                    </table>
+                <!-- 一覧表示エリア -->
+                <div id="audience-list-view">
+                    <div class="d-flex justify-content-between align-items-center mb-3" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h4>登録済みグループ</h4>
+                        <button onclick="showAudienceForm()" class="btn-primary" style="background-color: #007bff; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">
+                            <span>＋</span> 新規グループ作成
+                        </button>
+                    </div>
+
+                    <div class="table-container">
+                        <table id="audiences-table">
+                            <thead>
+                                <tr>
+                                    <th class="sortable" onclick="sortTable('audiences-table', 0, 'number')">ID</th>
+                                    <th class="sortable" onclick="sortTable('audiences-table', 1, 'text')">グループ名</th>
+                                    <th class="sortable" onclick="sortTable('audiences-table', 2, 'number')">表示順</th>
+                                    <th>メンバー数</th>
+                                    <th class="sortable" onclick="sortTable('audiences-table', 4, 'date')">作成日時</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="audiences-tbody"></tbody>
+                        </table>
+                    </div>
+                    <button onclick="loadAudiences()">更新</button>
                 </div>
-                <button onclick="loadAudiences()">更新</button>
+
+                <!-- 作成/編集フォーム（初期非表示） -->
+                <div id="audience-form-view" class="hidden">
+                    <div class="form-header" style="margin-bottom: 1rem;">
+                        <button onclick="backToAudienceList()" class="btn-back" style="background-color: #6c757d; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; margin-right: 1rem;">← 一覧に戻る</button>
+                        <h4 id="audience-form-title" style="display: inline;">新規グループ作成</h4>
+                    </div>
+
+                    <form id="audience-form">
+                        <input type="hidden" id="audience-id" value="">
+
+                        <div class="form-group">
+                            <label for="audience-name">グループ名 <span class="required" style="color: red;">*</span></label>
+                            <input type="text" id="audience-name" class="input-medium" placeholder="例: 理事会" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="audience-sort">表示順 <span class="required" style="color: red;">*</span></label>
+                            <input type="number" id="audience-sort" class="input-small" value="1" required>
+                        </div>
+
+                        <!-- メンバー選択エリア -->
+                        <div class="form-group">
+                            <label>所属メンバー</label>
+                            <div class="member-selection">
+                                <div id="member-checkboxes" class="checkbox-grid" style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; border-radius: 4px;">
+                                    <!-- 動的生成 -->
+                                </div>
+                                <div class="mt-2" style="margin-top: 0.5rem;">
+                                    <button type="button" onclick="selectAllMembers(true)" style="margin-right: 0.5rem; padding: 4px 8px; border: 1px solid #ddd; background: #f8f9fa; border-radius: 4px; cursor: pointer;">全選択</button>
+                                    <button type="button" onclick="selectAllMembers(false)" style="padding: 4px 8px; border: 1px solid #ddd; background: #f8f9fa; border-radius: 4px; cursor: pointer;">全解除</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-actions" style="margin-top: 1.5rem;">
+                            <button type="submit" class="btn-primary" style="background-color: #007bff; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; margin-right: 0.5rem;">
+                                <span id="submit-btn-text">作成</span>
+                            </button>
+                            <button type="button" onclick="backToAudienceList()" class="btn-secondary" style="background-color: #6c757d; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">
+                                キャンセル
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
 
             <!-- audienceメンバー管理セクション -->

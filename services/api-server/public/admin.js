@@ -97,6 +97,23 @@ let isAudienceLoaded = false;
 let isMembersResolved = false;
 let eventFormBound = false; // リスナー多重登録防止
 
+// ブラウザ戻る/進むボタン対応
+window.addEventListener('popstate', (e) => {
+    if (e.state?.section) {
+        showSection(e.state.section, true);
+    }
+});
+
+// ページ表示時の初期化（BFCache対応）
+window.addEventListener('pageshow', (event) => {
+    if (event.persisted) {
+        // BFCacheから復帰時の処理
+        if (currentSection === 'audience-manage') {
+            showAudienceList();
+        }
+    }
+});
+
 // ブラッシュアップ: DOM→状態の同期関数（初期化時＆送信直前に実行）
 function hydrateFromDOM() {
   // DOM要素が存在しない場合のガード（他のセクション表示時）
@@ -185,30 +202,35 @@ async function logout() {
 }
 
 // ========== ナビゲーション ==========
-function showSection(section) {
+function showSection(section, skipHistory = false) {
     currentSection = section;
-    
+
     // 全セクションを非表示
     document.querySelectorAll('[id$="-section"]').forEach(el => {
         if (el.id !== 'login-section' && el.id !== 'main-section') {
             el.classList.add('hidden');
         }
     });
-    
+
     // 全てのメッセージをクリア
     document.querySelectorAll('[id$="-message"]').forEach(el => {
         el.innerHTML = '';
     });
-    
+
     // 指定セクションを表示
     const sectionElement = document.getElementById(`${section}-section`);
     if (sectionElement) {
         sectionElement.classList.remove('hidden');
     }
-    
+
     // モバイルメニューを閉じる
     document.getElementById('nav-menu').classList.remove('active');
-    
+
+    // History API対応（ブラウザ戻る/進む）
+    if (!skipHistory && window.history) {
+        history.pushState({section}, '', `#${section}`);
+    }
+
     // データ読み込み
     switch(section) {
         case 'members':
@@ -223,8 +245,8 @@ function showSection(section) {
         case 'message-send':
             loadMessageSendSection();
             break;
-        case 'audience-list':
-            loadAudiences();
+        case 'audience-manage':
+            showAudienceList();
             break;
         case 'audience-members':
             loadAudienceMembers();
@@ -274,6 +296,18 @@ function showToast(message, type = 'info', duration = 3000) {
         setTimeout(() => toast.remove(), 300);
     }, duration);
 }
+
+// DOM Ready イベントで初期化
+document.addEventListener('DOMContentLoaded', function() {
+    // フォーム初期化
+    initAudienceForm();
+
+    // URL のハッシュから初期セクションを復元
+    const hash = window.location.hash.substring(1);
+    if (hash && hash !== 'login') {
+        currentSection = hash;
+    }
+});
 
 // ========== 確認ダイアログ ==========
 function confirmAction(message, callback, options = {}) {
@@ -1197,39 +1231,187 @@ async function proxyRespond(memberId, memberName, status) {
 // downloadCSV関数はCSV機能削除に伴い廃止
 
 // ========== Audience管理 ==========
-async function loadAudiences() {
-    try {
+
+// Audience管理の状態
+const audienceState = {
+    isLoading: false,
+    isEditing: false,
+    currentAudienceId: null,
+    audiences: [],
+    allMembers: [],
+    selectedMemberIds: new Set()
+};
+
+// API層の分離
+const audienceApi = {
+    async getAll() {
         const response = await fetch('/api/admin/audiences', {
             credentials: 'include'
         });
+        if (!response.ok) throw new Error('一覧取得失敗');
+        return response.json();
+    },
 
-        if (!response.ok) throw new Error('認証が必要です');
+    async getMembers(audienceId) {
+        const response = await fetch(`/api/admin/audiences/${audienceId}/members`, {
+            credentials: 'include'
+        });
+        if (!response.ok) throw new Error('メンバー取得失敗');
+        return response.json();
+    },
 
-        const data = await response.json();
-        const tbody = document.getElementById('audiences-tbody');
-        
-        tbody.innerHTML = data.items.map(audience => `
-            <tr>
-                <td>${audience.id}</td>
-                <td>${audience.name}</td>
-                <td>
-                    <input type="number" 
-                           value="${audience.sort_order || ''}" 
-                           style="width: 60px; text-align: center;"
-                           onchange="updateAudienceSortOrder(${audience.id}, this.value)"
-                           placeholder="順番">
-                </td>
-                <td>${new Date(audience.created_at).toLocaleString('ja-JP')}</td>
-                <td>
-                    <button onclick="manageAudienceMembers(${audience.id}, '${audience.name}')">メンバー管理</button>
-                    <button onclick="confirmAction('削除しますか？', () => deleteAudience(${audience.id}), {dangerous: true})" class="danger">削除</button>
-                </td>
-            </tr>
-        `).join('');
+    async getAllMembers() {
+        const response = await fetch('/api/admin/members', {
+            credentials: 'include'
+        });
+        if (!response.ok) throw new Error('全メンバー取得失敗');
+        return response.json();
+    },
+
+    async create(data) {
+        const response = await fetch('/api/admin/audiences', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(data)
+        });
+        if (!response.ok) throw new Error('作成失敗');
+        return response.json();
+    },
+
+    async update(audienceId, data) {
+        const response = await fetch(`/api/admin/audiences/${audienceId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(data)
+        });
+        if (!response.ok) throw new Error('更新失敗');
+        return response.json();
+    },
+
+    async updateMembers(audienceId, memberIds) {
+        const response = await fetch(`/api/admin/audiences/${audienceId}/members`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ member_ids: memberIds })
+        });
+        if (!response.ok) throw new Error('メンバー更新失敗');
+        return response.json();
+    },
+
+    async delete(audienceId) {
+        const response = await fetch(`/api/admin/audiences/${audienceId}`, {
+            method: 'DELETE',
+            credentials: 'include'
+        });
+        if (!response.ok) throw new Error('削除失敗');
+        return response.json();
+    }
+};
+
+// 一覧画面表示
+async function showAudienceList() {
+    document.getElementById('audience-list-view').classList.remove('hidden');
+    document.getElementById('audience-form-view').classList.add('hidden');
+
+    await loadAudiences();
+}
+
+// フォーム表示（新規/編集）
+async function showAudienceForm(audienceId = null) {
+    audienceState.isEditing = !!audienceId;
+    audienceState.currentAudienceId = audienceId;
+
+    // UI切り替え
+    document.getElementById('audience-list-view').classList.add('hidden');
+    document.getElementById('audience-form-view').classList.remove('hidden');
+
+    // タイトル設定
+    document.getElementById('audience-form-title').textContent =
+        audienceId ? 'グループ編集' : '新規グループ作成';
+    document.getElementById('submit-btn-text').textContent =
+        audienceId ? '更新' : '作成';
+
+    // フォームリセット
+    document.getElementById('audience-form').reset();
+    document.getElementById('audience-id').value = audienceId || '';
+    audienceState.selectedMemberIds.clear();
+
+    // メンバー一覧読み込み
+    await loadAllMembers();
+
+    // 編集時は既存データ読み込み
+    if (audienceId) {
+        await loadAudienceData(audienceId);
+    } else {
+        // 新規作成時は表示順のデフォルト値を設定
+        await setDefaultSortOrder();
+    }
+}
+
+// 一覧に戻る
+function backToAudienceList() {
+    showAudienceList();
+}
+
+// 表示順のデフォルト値設定（最大値+10）
+async function setDefaultSortOrder() {
+    try {
+        if (audienceState.audiences.length === 0) {
+            // まだ一覧を読み込んでいない場合は読み込み
+            const data = await audienceApi.getAll();
+            audienceState.audiences = data.audiences || [];
+        }
+
+        const maxSortOrder = audienceState.audiences.reduce((max, audience) => {
+            return Math.max(max, audience.sort_order || 0);
+        }, 0);
+
+        document.getElementById('audience-sort').value = maxSortOrder + 10;
+    } catch (error) {
+        console.error('デフォルト表示順設定エラー:', error);
+        document.getElementById('audience-sort').value = 1;
+    }
+}
+// Audience一覧読み込み
+async function loadAudiences() {
+    try {
+        audienceState.isLoading = true;
+        const data = await audienceApi.getAll();
+        audienceState.audiences = data.audiences || [];
+        displayAudiences(audienceState.audiences);
     } catch (error) {
         console.error('audiences一覧取得エラー:', error);
         showToast('グループ一覧の取得に失敗しました', 'error');
+    } finally {
+        audienceState.isLoading = false;
     }
+}
+
+// 一覧表示
+function displayAudiences(audiences) {
+    const tbody = document.getElementById('audiences-tbody');
+
+    if (audiences.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center">グループがありません</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = audiences.map(audience => `
+        <tr>
+            <td>${audience.id}</td>
+            <td>${audience.name}</td>
+            <td>${audience.sort_order}</td>
+            <td>${audience.member_count || 0}名</td>
+            <td>${new Date(audience.created_at).toLocaleString('ja-JP')}</td>
+            <td>
+                <button onclick="showAudienceForm(${audience.id})" class="btn-sm" style="padding: 4px 8px; margin-right: 4px; border: 1px solid #007bff; background: #007bff; color: white; border-radius: 4px; cursor: pointer;">編集</button>
+                <button onclick="deleteAudience(${audience.id})" class="btn-sm btn-danger" style="padding: 4px 8px; border: 1px solid #dc3545; background: #dc3545; color: white; border-radius: 4px; cursor: pointer;">削除</button>
+            </td>
+        </tr>
+    `).join('');
 }
 
 async function createAudience() {
@@ -1271,7 +1453,197 @@ async function createAudience() {
     }
 }
 
+// 既存Audienceデータ読み込み（編集時）
+async function loadAudienceData(audienceId) {
+    try {
+        // 基本情報取得
+        const audience = audienceState.audiences.find(a => a.id == audienceId);
+        if (audience) {
+            document.getElementById('audience-name').value = audience.name;
+            document.getElementById('audience-sort').value = audience.sort_order;
+        }
+
+        // メンバー情報取得
+        const data = await audienceApi.getMembers(audienceId);
+        const memberIds = data.items ? data.items.map(item => item.member_id) : [];
+        audienceState.selectedMemberIds = new Set(memberIds);
+        updateMemberCheckboxes();
+
+    } catch (error) {
+        console.error('データ読み込みエラー:', error);
+        showToast('データの読み込みに失敗しました', 'error');
+        backToAudienceList();
+    }
+}
+
+// 全メンバー読み込み
+async function loadAllMembers() {
+    try {
+        const data = await audienceApi.getAllMembers();
+        audienceState.allMembers = data.items || [];
+        renderMemberCheckboxes();
+    } catch (error) {
+        console.error('メンバー一覧取得エラー:', error);
+        showToast('メンバー一覧の取得に失敗しました', 'error');
+    }
+}
+
+// メンバーチェックボックス描画
+function renderMemberCheckboxes() {
+    const container = document.getElementById('member-checkboxes');
+
+    if (audienceState.allMembers.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: #6c757d;">メンバーがありません</p>';
+        return;
+    }
+
+    container.innerHTML = audienceState.allMembers.map(member => `
+        <label class="checkbox-item" style="display: block; margin-bottom: 4px; cursor: pointer;">
+            <input type="checkbox"
+                   name="member_ids"
+                   value="${member.id}"
+                   onchange="toggleMember(${member.id})"
+                   ${audienceState.selectedMemberIds.has(member.id) ? 'checked' : ''}
+                   style="margin-right: 6px;">
+            <span>${member.name}</span>
+        </label>
+    `).join('');
+}
+
+// フォーム初期化
+function initAudienceForm() {
+    const form = document.getElementById('audience-form');
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        await saveAudience();
+    });
+}
+
+// 保存処理（作成/更新）
+async function saveAudience() {
+    const submitBtn = document.querySelector('#audience-form button[type="submit"]');
+
+    if (submitBtn.disabled) return;
+
+    try {
+        // ボタン無効化
+        submitBtn.disabled = true;
+        submitBtn.querySelector('#submit-btn-text').textContent =
+            audienceState.isEditing ? '更新中...' : '作成中...';
+
+        // バリデーション
+        const name = document.getElementById('audience-name').value.trim();
+        const sortOrder = parseInt(document.getElementById('audience-sort').value);
+
+        if (!name) {
+            showToast('グループ名を入力してください', 'error');
+            return;
+        }
+
+        if (isNaN(sortOrder) || sortOrder < 0) {
+            showToast('表示順は0以上の数値を入力してください', 'error');
+            return;
+        }
+
+        // APIリクエスト
+        const audienceData = { name, sort_order: sortOrder };
+
+        let result;
+        if (audienceState.isEditing) {
+            // 更新処理
+            result = await audienceApi.update(audienceState.currentAudienceId, audienceData);
+
+            // メンバー更新
+            await audienceApi.updateMembers(
+                audienceState.currentAudienceId,
+                Array.from(audienceState.selectedMemberIds)
+            );
+        } else {
+            // 新規作成
+            result = await audienceApi.create(audienceData);
+
+            // メンバー登録
+            if (result.audience_id && audienceState.selectedMemberIds.size > 0) {
+                await audienceApi.updateMembers(
+                    result.audience_id,
+                    Array.from(audienceState.selectedMemberIds)
+                );
+            }
+        }
+
+        showToast(
+            audienceState.isEditing ? 'グループを更新しました' : 'グループを作成しました',
+            'success'
+        );
+
+        // 一覧に戻る
+        backToAudienceList();
+
+    } catch (error) {
+        console.error('保存エラー:', error);
+        showToast('保存に失敗しました', 'error');
+    } finally {
+        // ボタン状態を復元
+        submitBtn.disabled = false;
+        submitBtn.querySelector('#submit-btn-text').textContent =
+            audienceState.isEditing ? '更新' : '作成';
+    }
+}
+
+// 削除処理
 async function deleteAudience(id) {
+    if (!confirm('このグループを削除してもよろしいですか？')) {
+        return;
+    }
+
+    try {
+        await audienceApi.delete(id);
+        showToast('グループを削除しました', 'success');
+        await loadAudiences();
+    } catch (error) {
+        console.error('削除エラー:', error);
+        showToast('削除に失敗しました', 'error');
+    }
+}
+
+// ユーティリティ関数
+
+// メンバー選択切り替え
+function toggleMember(memberId) {
+    if (audienceState.selectedMemberIds.has(memberId)) {
+        audienceState.selectedMemberIds.delete(memberId);
+    } else {
+        audienceState.selectedMemberIds.add(memberId);
+    }
+}
+
+// 全選択/全解除
+function selectAllMembers(selectAll) {
+    const checkboxes = document.querySelectorAll('input[name="member_ids"]');
+
+    checkboxes.forEach(cb => {
+        cb.checked = selectAll;
+        const memberId = parseInt(cb.value);
+        if (selectAll) {
+            audienceState.selectedMemberIds.add(memberId);
+        } else {
+            audienceState.selectedMemberIds.delete(memberId);
+        }
+    });
+}
+
+// チェックボックス状態更新（編集時）
+function updateMemberCheckboxes() {
+    const checkboxes = document.querySelectorAll('input[name="member_ids"]');
+    checkboxes.forEach(cb => {
+        const memberId = parseInt(cb.value);
+        cb.checked = audienceState.selectedMemberIds.has(memberId);
+    });
+}
+
+// 旧関数との互換性のため残しておく（段階的移行）
+async function deleteAudience_old(id) {
     try {
         const response = await fetch(`/api/admin/audiences/${id}`, {
             method: 'DELETE',
