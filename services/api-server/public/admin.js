@@ -1395,17 +1395,15 @@ function displayAudiences(audiences) {
     const tbody = document.getElementById('audiences-tbody');
 
     if (audiences.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center">グループがありません</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center">グループがありません</td></tr>';
         return;
     }
 
     tbody.innerHTML = audiences.map(audience => `
         <tr>
-            <td>${audience.id}</td>
-            <td>${audience.name}</td>
             <td>${audience.sort_order}</td>
+            <td>${audience.name}</td>
             <td>${audience.member_count || 0}名</td>
-            <td>${new Date(audience.created_at).toLocaleString('ja-JP')}</td>
             <td>
                 <button onclick="showAudienceForm(${audience.id})" class="btn-sm" style="padding: 4px 8px; margin-right: 4px; border: 1px solid #007bff; background: #007bff; color: white; border-radius: 4px; cursor: pointer;">編集</button>
                 <button onclick="deleteAudience(${audience.id})" class="btn-sm btn-danger" style="padding: 4px 8px; border: 1px solid #dc3545; background: #dc3545; color: white; border-radius: 4px; cursor: pointer;">削除</button>
@@ -1472,7 +1470,7 @@ async function loadAudienceData(audienceId) {
     } catch (error) {
         console.error('データ読み込みエラー:', error);
         showToast('データの読み込みに失敗しました', 'error');
-        backToAudienceList();
+        showSection('audience-manage');
     }
 }
 
@@ -1578,7 +1576,7 @@ async function saveAudience() {
         );
 
         // 一覧に戻る
-        backToAudienceList();
+        showSection('audience-manage');
 
     } catch (error) {
         console.error('保存エラー:', error);
