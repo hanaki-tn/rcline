@@ -1307,7 +1307,8 @@ const audienceApi = {
             credentials: 'include'
         });
         if (!response.ok) throw new Error('削除失敗');
-        return response.json();
+        // 204 No Contentの場合はJSONパースしない
+        return response.status === 204 ? {} : response.json();
     }
 };
 
