@@ -1963,18 +1963,33 @@ function switchMessageTab(tabName) {
 }
 
 // 画像アップロード処理
+// ファイル名を適切な長さに切り詰める関数
+function truncateFileName(fileName, maxLength) {
+    if (fileName.length <= maxLength) return fileName;
+
+    const extension = fileName.lastIndexOf('.') !== -1
+        ? fileName.substring(fileName.lastIndexOf('.'))
+        : '';
+    const nameWithoutExt = fileName.substring(0, fileName.lastIndexOf('.') !== -1
+        ? fileName.lastIndexOf('.')
+        : fileName.length);
+    const truncatedName = nameWithoutExt.substring(0, maxLength - extension.length - 3) + '...';
+
+    return truncatedName + extension;
+}
+
 function handleImageUpload() {
     const fileInput = document.getElementById('message-image');
     const preview = document.getElementById('image-preview');
     const previewImg = document.getElementById('preview-img');
     const imageInfo = document.getElementById('image-info');
-    
+
     const file = fileInput.files[0];
     if (!file) {
         preview.classList.add('hidden');
         return;
     }
-    
+
     // ファイルサイズチェック（5MB）
     if (file.size > 5 * 1024 * 1024) {
         showToast('ファイルサイズが5MBを超えています', 'error');
@@ -1982,7 +1997,7 @@ function handleImageUpload() {
         preview.classList.add('hidden');
         return;
     }
-    
+
     // プレビュー表示
     const reader = new FileReader();
     reader.onload = (e) => {
