@@ -2203,7 +2203,7 @@ function displayMessageHistory(messages) {
         }
 
         // 送信者
-        row.insertCell().textContent = msg.sent_by_username || '不明';
+        row.insertCell().textContent = msg.sent_by_name || msg.sent_by_username || '不明';
 
         // 操作
         const actionCell = row.insertCell();
@@ -2277,7 +2277,7 @@ async function showRecipientDetails(messageLogId) {
         const sentAt = new Date(log.sent_at);
         document.getElementById('modal-sent-at').textContent = sentAt.toLocaleString('ja-JP');
         document.getElementById('modal-audience').textContent = log.audience_name || 'グループ削除済み';
-        document.getElementById('modal-sender').textContent = log.sent_by_username || '不明';
+        document.getElementById('modal-sender').textContent = log.sent_by_name || log.sent_by_username || '不明';
         document.getElementById('modal-type').textContent = log.type === 'text' ? 'テキスト' : '画像';
 
         // メッセージ内容

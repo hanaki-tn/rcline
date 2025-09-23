@@ -1472,6 +1472,7 @@ router.get('/messages', requireAuth, (req, res) => {
       ml.recipient_count,
       ml.sent_by_admin,
       au.username as sent_by_username,
+      m.name as sent_by_name,
       ml.sent_at,
       ml.success_count,
       ml.fail_count,
@@ -1485,6 +1486,7 @@ router.get('/messages', requireAuth, (req, res) => {
     FROM message_logs ml
     LEFT JOIN audiences a ON ml.audience_id = a.id
     LEFT JOIN admin_users au ON ml.sent_by_admin = au.id
+    LEFT JOIN members m ON au.member_id = m.id
     ORDER BY ml.created_at DESC
     LIMIT ? OFFSET ?
   `;
@@ -1539,10 +1541,12 @@ router.get('/messages/:id/recipients', requireAuth, (req, res) => {
       SELECT
         ml.*,
         a.name as audience_name,
-        au.username as sent_by_username
+        au.username as sent_by_username,
+        m.name as sent_by_name
       FROM message_logs ml
       LEFT JOIN audiences a ON ml.audience_id = a.id
       LEFT JOIN admin_users au ON ml.sent_by_admin = au.id
+      LEFT JOIN members m ON au.member_id = m.id
       WHERE ml.id = ?
     `;
 
