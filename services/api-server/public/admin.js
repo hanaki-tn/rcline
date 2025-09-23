@@ -2296,7 +2296,6 @@ async function showRecipientDetails(messageLogId) {
         recipients.forEach(recipient => {
             const row = tbody.insertRow();
             row.insertCell().textContent = recipient.name;
-            row.insertCell().textContent = recipient.student_id || '-';
 
             const lineCell = row.insertCell();
             if (recipient.line_user_id) {

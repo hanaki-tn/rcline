@@ -1520,7 +1520,6 @@ router.get('/messages/:id/recipients', requireAuth, (req, res) => {
     SELECT
       mlr.member_id,
       m.name,
-      m.student_id,
       m.line_user_id,
       mlr.created_at
     FROM message_log_recipients mlr
