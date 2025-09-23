@@ -108,5 +108,45 @@ CREATE TABLE event_push_stats (
   FOREIGN KEY(event_id) REFERENCES events(id) ON UPDATE CASCADE ON DELETE CASCADE
 );
 
+-- 追加インデックス（パフォーマンス最適化）
+CREATE INDEX idx_event_targets_lookup ON event_targets(event_id, member_id);
+CREATE INDEX idx_event_responses_latest ON event_responses(event_id, member_id, responded_at DESC);
+CREATE INDEX idx_members_display ON members(display_order, name);
+
+-- メッセージ送信ログ
+CREATE TABLE message_logs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  type TEXT NOT NULL CHECK(type IN ('text', 'image')),
+  message_text TEXT,                    -- テキストメッセージ内容
+  image_url TEXT,                       -- 画像URL（オリジナル）
+  image_preview_url TEXT,               -- プレビュー画像URL
+  image_size INTEGER,                   -- 画像ファイルサイズ
+  image_preview_size INTEGER,           -- プレビュー画像ファイルサイズ
+  audience_id INTEGER,                  -- 送信先audience
+  recipient_count INTEGER NOT NULL,     -- 送信対象者数
+  sent_by_admin INTEGER NOT NULL,       -- 送信者
+  sent_at TEXT NOT NULL,                -- 送信日時（JST ISO8601）
+  success_count INTEGER DEFAULT 0,      -- 送信成功数
+  fail_count INTEGER DEFAULT 0,         -- 送信失敗数
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY(audience_id) REFERENCES audiences(id) ON UPDATE CASCADE,
+  FOREIGN KEY(sent_by_admin) REFERENCES admin_users(id) ON UPDATE CASCADE
+);
+CREATE INDEX idx_message_logs_sent_at ON message_logs(sent_at);
+CREATE INDEX idx_message_logs_sent_by_admin ON message_logs(sent_by_admin);
+
+-- メッセージ送信履歴の受信者記録
+CREATE TABLE message_log_recipients (
+  message_log_id INTEGER NOT NULL,
+  member_id INTEGER NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+  PRIMARY KEY (message_log_id, member_id),
+  FOREIGN KEY (message_log_id) REFERENCES message_logs(id) ON DELETE CASCADE,
+  FOREIGN KEY (member_id) REFERENCES members(id)
+);
+CREATE INDEX idx_message_log_recipients_member_id ON message_log_recipients(member_id);
+CREATE INDEX idx_message_log_recipients_created_at ON message_log_recipients(created_at);
+
 -- 外部キー有効化
 PRAGMA foreign_keys = ON;
