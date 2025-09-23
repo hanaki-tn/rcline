@@ -2261,7 +2261,11 @@ async function showRecipientDetails(messageLogId) {
             credentials: 'include'
         });
 
-        if (!response.ok) throw new Error('受信者情報取得失敗');
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('API Error Response:', response.status, errorText);
+            throw new Error(`受信者情報取得失敗 (${response.status})`);
+        }
 
         const data = await response.json();
 
