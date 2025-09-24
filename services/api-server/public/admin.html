@@ -334,26 +334,6 @@
             transition: 0.3s;
         }
         
-        /* 検索・フィルター */
-        .search-box {
-            position: relative;
-            display: inline-block;
-            margin-bottom: 20px;
-        }
-        
-        .search-box input {
-            padding-left: 35px;
-            width: 300px;
-        }
-        
-        .search-box::before {
-            content: '🔍';
-            position: absolute;
-            left: 10px;
-            top: 50%;
-            transform: translateY(-50%);
-        }
-        
         /* トースト通知 */
         .toast-container {
             position: fixed;
@@ -893,9 +873,8 @@
                 
                 <!-- 検索・フィルター -->
                 <div class="d-flex gap-2" style="align-items: center; margin-bottom: 20px;">
-                    <div class="search-box">
-                        <!-- 検索機能は不要のため削除 -->
-                    </div>
+                    <!-- 検索機能は削除済み -->
+                    <div></div>
                 </div>
                 
                 <div class="table-container">
