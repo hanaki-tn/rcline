@@ -194,14 +194,19 @@
             try {
                 console.log('[register] initPage開始');
 
-                // 認証とuserId確定（LIFF初期化もここで完了させる）
-                const me = await getCurrentUser(true);
+                // LIFFAuthを使った認証（eventsと同じ方式）
+                // register画面では無限ループ回避のためredirectToRegister: false
+                const me = await liffAuth.initialize({
+                    redirectToRegister: false,
+                    fromPage: (fromEvents ? 'events' : fromDetail ? 'detail' : 'register')
+                });
+
                 if (!me) {
-                    console.error('[register] getCurrentUser失敗 - 認証エラー');
+                    console.error('[register] 認証未完了/失敗');
                     uiShowError('認証に失敗しました。LINEアプリ内から開き直してください。');
                     return;
                 }
-                console.log('[register] getCurrentUser成功:', me);
+                console.log('[register] 認証成功:', me);
 
                 // 開発環境でのユーザー情報表示
                 if (CONFIG.isDev) {
@@ -289,6 +294,10 @@
                     if (typeof clearAuthCache === 'function') {
                         clearAuthCache();
                     }
+
+                    // LIFFAuthの状態もリセット（refresh()メソッドは存在しないため手動リセット）
+                    liffAuth.initialized = false;
+                    liffAuth.currentUser = null;
 
                     // 1秒後に遷移
                     setTimeout(() => {
@@ -421,5 +430,6 @@
         onerror="console.error('LIFF SDK load FAILED'); window.liffSdkLoadError = true;">
     </script>
     <script src="common.js"></script>
+    <script src="auth.js"></script>
 </body>
 </html>
