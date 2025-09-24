@@ -1398,7 +1398,7 @@ async function setDefaultSortOrder() {
         if (audienceState.audiences.length === 0) {
             // まだ一覧を読み込んでいない場合は読み込み
             const data = await audienceApi.getAll();
-            audienceState.audiences = data.audiences || [];
+            audienceState.audiences = data.items || [];
         }
 
         const maxSortOrder = audienceState.audiences.reduce((max, audience) => {
@@ -1416,7 +1416,7 @@ async function loadAudiences() {
     try {
         audienceState.isLoading = true;
         const data = await audienceApi.getAll();
-        audienceState.audiences = data.audiences || [];
+        audienceState.audiences = data.items || [];
         displayAudiences(audienceState.audiences);
     } catch (error) {
         console.error('audiences一覧取得エラー:', error);
