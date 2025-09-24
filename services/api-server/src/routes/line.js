@@ -32,7 +32,7 @@ router.post('/webhook', async (req, res) => {
       
       if (event.type === 'follow') {
         console.log(`[${new Date().toISOString()}] INFO: followイベント検出 - キューに追加開始`);
-        
+
         // 非同期ジョブをキューに追加
         await req.queue.linkFollow.add('link_follow', {
           mode: process.env.ONBOARDING_MODE || 'silent',
@@ -40,8 +40,19 @@ router.post('/webhook', async (req, res) => {
           replyToken: event.replyToken,
           eventTs: event.timestamp
         });
-        
+
         console.log(`[${new Date().toISOString()}] INFO: followイベント - キュー追加完了`);
+      } else if (event.type === 'unfollow') {
+        console.log(`[${new Date().toISOString()}] INFO: unfollowイベント検出 - キューに追加開始`);
+
+        // ブロック・友だち削除処理をキューに追加
+        await req.queue.linkUnfollow.add('link_unfollow', {
+          mode: 'silent',
+          userId: event.source.userId,
+          eventTs: event.timestamp
+        });
+
+        console.log(`[${new Date().toISOString()}] INFO: unfollowイベント - キュー追加完了`);
       }
     }
 

@@ -29,6 +29,7 @@ export async function linkByDisplayName(db, userId, displayName) {
     }
 
     // 候補探索（1件のみ受理）
+    // 第1段階：name_keyで検索
     db.all(
       'SELECT id, line_user_id FROM members WHERE name_key = ? LIMIT 2',
       [normalized],
@@ -40,84 +41,111 @@ export async function linkByDisplayName(db, userId, displayName) {
           });
         }
 
-        if (rows.length === 0) {
-          return resolve({
-            type: 'UNMATCHED',
-            normalizedName: normalized
-          });
+        // name_keyでマッチした場合は既存処理を継続
+        if (rows.length > 0) {
+          handleMatchedMembers(rows, normalized, userId, displayName, db, resolve);
+          return;
         }
 
-        if (rows.length > 1) {
-          return resolve({
-            type: 'AMBIGUOUS',
-            normalizedName: normalized,
-            reason: 'Multiple matches found'
-          });
-        }
+        // 第2段階：line_display_nameで検索（fallback）
+        db.all(
+          'SELECT id, line_user_id FROM members WHERE line_display_name = ? LIMIT 2',
+          [displayName],
+          async (err, rows) => {
+            if (err) {
+              return resolve({
+                type: 'ERROR',
+                reason: err.message
+              });
+            }
 
-        const member = rows[0];
-        
-        // 既に紐づけ済みかチェック
-        if (member.line_user_id) {
-          if (member.line_user_id === userId) {
-            // display_nameを更新
-            db.run(
-              'UPDATE members SET line_display_name = ?, updated_at = ? WHERE id = ?',
-              [displayName, nowJST(), member.id],
-              (err) => {
-                if (err) {
-                  return resolve({
-                    type: 'ERROR',
-                    reason: err.message
-                  });
-                }
-                resolve({
-                  type: 'ALREADY_LINKED_SAME',
-                  memberId: member.id,
-                  normalizedName: normalized
-                });
-              }
-            );
-          } else {
-            resolve({
-              type: 'ALREADY_LINKED_OTHER',
-              memberId: member.id,
-              normalizedName: normalized,
-              reason: 'Already linked to different user'
-            });
+            if (rows.length === 0) {
+              return resolve({
+                type: 'UNMATCHED',
+                normalizedName: normalized,
+                reason: 'No match found by name_key or line_display_name'
+              });
+            }
+
+            handleMatchedMembers(rows, normalized, userId, displayName, db, resolve);
           }
-        } else {
-          // 新規紐づけ
+        );
+      }
+    );
+
+    // マッチしたメンバーの処理（共通化）
+    function handleMatchedMembers(rows, normalized, userId, displayName, db, resolve) {
+
+      if (rows.length > 1) {
+        return resolve({
+          type: 'AMBIGUOUS',
+          normalizedName: normalized,
+          reason: 'Multiple matches found'
+        });
+      }
+
+      const member = rows[0];
+
+      // 既に紐づけ済みかチェック
+      if (member.line_user_id) {
+        if (member.line_user_id === userId) {
+          // display_nameを更新
           db.run(
-            'UPDATE members SET line_user_id = ?, line_display_name = ?, is_target = 1, updated_at = ? WHERE id = ? AND line_user_id IS NULL',
-            [userId, displayName, nowJST(), member.id],
-            function(err) {
+            'UPDATE members SET line_display_name = ?, updated_at = ? WHERE id = ?',
+            [displayName, nowJST(), member.id],
+            (err) => {
               if (err) {
                 return resolve({
                   type: 'ERROR',
                   reason: err.message
                 });
               }
-              
-              if (this.changes === 1) {
-                resolve({
-                  type: 'LINKED',
-                  memberId: member.id,
-                  normalizedName: normalized
-                });
-              } else {
-                resolve({
-                  type: 'ALREADY_LINKED_OTHER',
-                  memberId: member.id,
-                  normalizedName: normalized,
-                  reason: 'Concurrent update detected'
-                });
-              }
+              resolve({
+                type: 'ALREADY_LINKED_SAME',
+                memberId: member.id,
+                normalizedName: normalized
+              });
             }
           );
+        } else {
+          resolve({
+            type: 'ALREADY_LINKED_OTHER',
+            memberId: member.id,
+            normalizedName: normalized,
+            reason: 'Already linked to different user'
+          });
         }
+      } else {
+        // 新規紐づけ
+        db.run(
+          'UPDATE members SET line_user_id = ?, line_display_name = ?, is_target = 1, updated_at = ? WHERE id = ? AND line_user_id IS NULL',
+          [userId, displayName, nowJST(), member.id],
+          function(err) {
+            if (err) {
+              return resolve({
+                type: 'ERROR',
+                reason: err.message
+              });
+            }
+
+            if (this.changes === 1) {
+              resolve({
+                type: 'LINKED',
+                memberId: member.id,
+                normalizedName: normalized
+              });
+            } else {
+              resolve({
+                type: 'ALREADY_LINKED_OTHER',
+                memberId: member.id,
+                normalizedName: normalized,
+                reason: 'Concurrent update detected'
+              });
+            }
+          }
+        );
       }
-    );
+    }
   });
 }
 
