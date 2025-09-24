@@ -59,13 +59,15 @@
                 // 未紐付け（is_target=0）の場合は会員登録画面へ遷移
                 if (!userData.is_target || userData.is_target === 0) {
                     console.log('未紐付けユーザーのため、会員登録画面へ遷移します');
-                    
-                    // URLパラメータを保持して会員登録画面へ遷移
+
+                    // URLパラメータを保持して会員登録画面へ遷移（debugパラメータも引き継ぐ）
                     const eventId = getUrlParameter('id');
+                    const debugParam = getUrlParameter('debug') === '1' ? '&debug=1' : '';
+
                     if (eventId) {
-                        window.location.href = `register.html?from=detail&id=${eventId}`;
+                        window.location.href = `register.html?from=detail&id=${eventId}${debugParam}`;
                     } else {
-                        window.location.href = 'register.html?from=events';
+                        window.location.href = `register.html?from=events${debugParam}`;
                     }
                     return;
                 }

@@ -192,7 +192,16 @@
         // ページ初期化
         async function initPage() {
             try {
-                // LIFF初期化は common.js の getCurrentUser() で処理
+                console.log('[register] initPage開始');
+
+                // 認証とuserId確定（LIFF初期化もここで完了させる）
+                const me = await getCurrentUser(true);
+                if (!me) {
+                    console.error('[register] getCurrentUser失敗 - 認証エラー');
+                    uiShowError('認証に失敗しました。LINEアプリ内から開き直してください。');
+                    return;
+                }
+                console.log('[register] getCurrentUser成功:', me);
 
                 // 開発環境でのユーザー情報表示
                 if (CONFIG.isDev) {
@@ -226,7 +235,7 @@
                     
                     if (userData.is_target === 1) {
                         // 既に紐付け済みの場合
-                        showSuccess('既に会員登録が完了しています。');
+                        uiShowSuccess('既に会員登録が完了しています。');
                         setTimeout(() => {
                             navigateAfterRegistration();
                         }, 1000);
@@ -238,27 +247,29 @@
 
             } catch (error) {
                 console.error('ページ初期化エラー:', error);
-                showError('認証に失敗しました。LINEから再度アクセスしてください。');
+                uiShowError('認証に失敗しました。LINEから再度アクセスしてください。');
             }
         }
 
         // 登録処理
         async function handleSubmit(event) {
             event.preventDefault();
-            
+
             const fullName = fullNameInput.value.trim();
-            
+            console.log('[register] handleSubmit開始 - 入力名:', fullName);
+
             if (!fullName) {
-                showError('お名前を入力してください。');
+                uiShowError('お名前を入力してください。');
                 return;
             }
 
             // ボタン無効化
             submitBtn.disabled = true;
             submitBtn.textContent = '登録中...';
-            hideMessages();
+            uiHideMessages();
 
             try {
+                console.log('[register] APIリクエスト開始: /api/liff/register');
                 const response = await apiRequest('/api/liff/register', {
                     method: 'POST',
                     headers: {
@@ -267,34 +278,43 @@
                     body: JSON.stringify({ full_name: fullName })
                 });
 
+                console.log('[register] APIレスポンス受信 - ステータス:', response.status);
+
                 if (response.ok) {
                     const result = await response.json();
-                    showSuccess('会員登録が完了しました。');
-                    
+                    console.log('[register] 登録成功:', result);
+                    uiShowSuccess('会員登録が完了しました。');
+
                     // 会員登録成功時：認証キャッシュをクリア
                     if (typeof clearAuthCache === 'function') {
                         clearAuthCache();
                     }
-                    
+
                     // 1秒後に遷移
                     setTimeout(() => {
                         navigateAfterRegistration();
                     }, 1000);
                 } else {
                     const error = await response.json();
+                    console.error('[register] APIエラー:', error);
+
                     if (error.code === 'NO_MATCH') {
-                        showError('入力された名前が会員名簿と一致しませんでした。正確な漢字フルネームを入力してください。');
+                        uiShowError('入力された名前が会員名簿と一致しませんでした。正確な漢字フルネームを入力してください。');
                     } else {
-                        showError(error.message || '登録に失敗しました。');
+                        uiShowError(error.message || '登録に失敗しました。');
                     }
-                    
+
                     // ボタン再有効化
                     submitBtn.disabled = false;
                     submitBtn.textContent = '登録';
                 }
             } catch (error) {
-                console.error('登録エラー:', error);
-                showError('通信エラーが発生しました。もう一度お試しください。');
+                console.error('[register] 登録処理エラー:', error);
+                console.error('[register] エラー詳細:', {
+                    message: error.message,
+                    stack: error.stack
+                });
+                uiShowError('通信エラーが発生しました。LINEアプリ内で開いているかをご確認のうえ、もう一度お試しください。');
                 
                 // ボタン再有効化
                 submitBtn.disabled = false;
@@ -337,22 +357,25 @@
             }
         }
 
-        // エラーメッセージ表示
-        function showError(message) {
+        // UIメッセージ表示関数（common.jsの関数と名前が衝突しないようリネーム）
+        function uiShowError(message) {
+            console.log('[register] uiShowError called:', message);
             errorMessage.textContent = message;
             errorMessage.style.display = 'block';
             successMessage.style.display = 'none';
         }
 
         // 成功メッセージ表示
-        function showSuccess(message) {
+        function uiShowSuccess(message) {
+            console.log('[register] uiShowSuccess called:', message);
             successMessage.textContent = message;
             successMessage.style.display = 'block';
             errorMessage.style.display = 'none';
         }
 
         // メッセージ非表示
-        function hideMessages() {
+        function uiHideMessages() {
+            console.log('[register] uiHideMessages called');
             errorMessage.style.display = 'none';
             successMessage.style.display = 'none';
         }
