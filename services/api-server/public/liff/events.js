@@ -256,7 +256,7 @@ function displayEventDetail() {
                             ${escapeHtml(event.extra_text_label || '追加メモ')}
                             ${event.extra_text_attend_only ? '<small style="color: #dc3545;">※出席の場合は入力必須</small>' : ''}
                         </label>
-                        <textarea id="extra-text" rows="3" placeholder="${event.extra_text_attend_only ? '出席の場合は必ずご記入ください' : ''}">${escapeHtml(currentResponse.extra_text || '')}</textarea>
+                        <input type="text" id="extra-text" maxlength="100" placeholder="${event.extra_text_attend_only ? '出席の場合は必ずご記入ください' : ''}" value="${escapeHtml(currentResponse.extra_text || '')}" />
                     </div>
                 ` : ''}
 
@@ -321,7 +321,7 @@ function displayEventDetail() {
         html += `
             <div class="collapsible">
                 <div class="collapsible-header">
-                    <span>📝 回答履歴 (${event.response_history.length}件)</span>
+                    <span>📝 回答履歴</span>
                     <span class="collapse-icon">▼</span>
                 </div>
                 <div class="collapsible-content">
