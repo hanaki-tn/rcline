@@ -340,12 +340,12 @@
 
         // 登録後の遷移
         function navigateAfterRegistration() {
-            if (fromDetail && eventId) {
-                // 特定イベント詳細から来た場合は該当イベント詳細へ
-                window.location.href = `detail.html?id=${eventId}`;
+            if (fromEvents && eventId) {
+                // イベント詳細から来た場合は同じ詳細に戻る（events.htmlの詳細ビュー）
+                window.location.href = `events.html?view=detail&id=${eventId}`;
             } else if (fromEvents) {
-                // イベント一覧から来た場合は一覧へ戻る
-                window.location.href = 'index.html';
+                // イベント一覧から来た場合は一覧に戻る（events.html）
+                window.location.href = 'events.html';
             } else {
                 // それ以外はLINEチャット画面へ
                 closeLiffWindow();

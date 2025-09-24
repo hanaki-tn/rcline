@@ -150,6 +150,99 @@ export async function linkByDisplayName(db, userId, displayName) {
 }
 
 // フルネームによる紐づけ（LIFF登録用）
-export async function linkByFullName(db, userId, inputName) {
-  return linkByDisplayName(db, userId, inputName);
+export async function linkByFullName(db, userId, inputName, actualDisplayName) {
+  return new Promise((resolve, reject) => {
+    const normalized = normalizeName(inputName);  // 入力名で検索
+    const displayNameToSave = actualDisplayName || inputName;  // 保存するのはLINE表示名
+
+    if (!normalized) {
+      return resolve({
+        type: 'UNMATCHED',
+        reason: 'Empty input name'
+      });
+    }
+
+    // name_keyでのみ検索（register時はline_display_name検索は行わない）
+    db.all(
+      'SELECT id, line_user_id FROM members WHERE name_key = ? LIMIT 2',
+      [normalized],
+      (err, rows) => {
+        if (err) {
+          return resolve({
+            type: 'ERROR',
+            reason: err.message
+          });
+        }
+
+        if (rows.length === 0) {
+          return resolve({
+            type: 'UNMATCHED',
+            normalizedName: normalized,
+            reason: 'No match found by name_key'
+          });
+        }
+
+        if (rows.length > 1) {
+          return resolve({
+            type: 'AMBIGUOUS',
+            normalizedName: normalized,
+            reason: 'Multiple matches found'
+          });
+        }
+
+        const member = rows[0];
+
+        // 既に紐づけ済みかチェック
+        if (member.line_user_id) {
+          if (member.line_user_id === userId) {
+            // line_display_nameを正しいLINE表示名で更新
+            db.run(
+              'UPDATE members SET line_display_name = ?, updated_at = ? WHERE id = ?',
+              [displayNameToSave, nowJST(), member.id],
+              (err) => {
+                if (err) {
+                  return resolve({
+                    type: 'ERROR',
+                    reason: err.message
+                  });
+                }
+
+                resolve({
+                  type: 'ALREADY_LINKED_SAME',
+                  memberId: member.id,
+                  normalizedName: normalized
+                });
+              }
+            );
+          } else {
+            resolve({
+              type: 'ALREADY_LINKED_OTHER',
+              normalizedName: normalized,
+              reason: `Already linked to different user: ${member.line_user_id}`
+            });
+          }
+        } else {
+          // 新規紐づけ
+          db.run(
+            'UPDATE members SET line_user_id = ?, line_display_name = ?, updated_at = ? WHERE id = ?',
+            [userId, displayNameToSave, nowJST(), member.id],
+            (err) => {
+              if (err) {
+                return resolve({
+                  type: 'ERROR',
+                  reason: err.message
+                });
+              }
+
+              resolve({
+                type: 'LINKED',
+                memberId: member.id,
+                normalizedName: normalized
+              });
+            }
+          );
+        }
+      }
+    );
+  });
 }

@@ -128,7 +128,7 @@ router.post('/register', requireLineUser, async (req, res) => {
     // LINE表示名を取得
     const displayName = await getLineProfile(req.lineUserId);
 
-    const result = await linkByFullName(req.db, req.lineUserId, full_name);
+    const result = await linkByFullName(req.db, req.lineUserId, full_name, displayName);
 
     // NDJSONログ記録
     const logData = {
@@ -159,7 +159,7 @@ router.post('/register', requireLineUser, async (req, res) => {
     if (result.type === 'LINKED' || result.type === 'ALREADY_LINKED_SAME') {
       res.json({ ok: true });
     } else {
-      res.status(404).json({
+      res.status(422).json({
         code: 'NO_MATCH',
         message: 'No matching member found'
       });
