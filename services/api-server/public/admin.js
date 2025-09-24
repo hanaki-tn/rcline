@@ -54,6 +54,38 @@ const fmtDateTimeJp = (dateStr) => {
   }
 };
 
+// 開催日時用（秒なし）
+const fmtDateTimeJpNoSec = (dateStr) => {
+  if (!dateStr) return '—';
+  try {
+    const date = new Date(dateStr);
+    return date.toLocaleString('ja-JP', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  } catch {
+    return '—';
+  }
+};
+
+// 日付のみ用
+const fmtDateJpOnly = (dateStr) => {
+  if (!dateStr) return '—';
+  try {
+    const date = new Date(dateStr);
+    return date.toLocaleString('ja-JP', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+  } catch {
+    return '—';
+  }
+};
+
 const fmtDateJp = (dateStr) => {
   if (!dateStr) return '—';
   try {
@@ -527,16 +559,15 @@ function displayEvents(events) {
     const tbody = document.getElementById('events-tbody');
 
     if (events.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center">イベントがありません</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center">イベントがありません</td></tr>';
     } else {
         tbody.innerHTML = events.map(event => {
-            const heldAt = fmtDateTimeJp(event.held_at);
-            const deadlineAt = fmtDateTimeJp(event.deadline_at);
+            const heldAt = fmtDateTimeJpNoSec(event.held_at);
+            const deadlineAt = fmtDateJpOnly(event.deadline_at);
             return `
                 <tr>
-                    <td>${event.id}</td>
-                    <td>${event.title}</td>
                     <td>${heldAt}</td>
+                    <td>${event.title}</td>
                     <td>${deadlineAt}</td>
                     <td>${event.target_count || 0}名</td>
                     <td>
@@ -1053,8 +1084,8 @@ async function loadEventDetail() {
         
         // 基本情報
         const basicInfoDiv = document.getElementById('event-basic-info');
-        const heldAt = fmtDateTimeJp(event.held_at);
-        const deadlineAt = fmtDateTimeJp(event.deadline_at);
+        const heldAt = fmtDateTimeJpNoSec(event.held_at);
+        const deadlineAt = fmtDateJpOnly(event.deadline_at);
         basicInfoDiv.innerHTML = `
             <p><strong>タイトル:</strong> ${event.title}</p>
             <p><strong>開催日時:</strong> ${heldAt}</p>

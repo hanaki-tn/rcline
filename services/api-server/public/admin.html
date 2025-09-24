@@ -896,18 +896,16 @@
                     <div class="search-box">
                         <!-- 検索機能は不要のため削除 -->
                     </div>
-                    <button onclick="loadEvents()">読み込み</button>
                 </div>
                 
                 <div class="table-container">
                     <table id="events-table">
                         <thead>
                             <tr>
-                                <th class="sortable" onclick="sortTable('events-table', 0, 'number')">ID</th>
+                                <th class="sortable" onclick="sortTable('events-table', 0, 'date')">開催日時</th>
                                 <th class="sortable" onclick="sortTable('events-table', 1, 'text')">タイトル</th>
-                                <th class="sortable" onclick="sortTable('events-table', 2, 'date')">開催日時</th>
-                                <th class="sortable" onclick="sortTable('events-table', 3, 'date')">回答締切</th>
-                                <th class="sortable" onclick="sortTable('events-table', 4, 'number')">対象者数</th>
+                                <th class="sortable" onclick="sortTable('events-table', 2, 'date')">回答締切</th>
+                                <th class="sortable" onclick="sortTable('events-table', 3, 'number')">対象者数</th>
                                 <th>操作</th>
                             </tr>
                         </thead>

@@ -1,10 +1,30 @@
 import express from 'express';
+import axios from 'axios';
 import { linkByFullName } from '../services/linker.js';
 import { nowJST } from '../database.js';
 import fs from 'fs';
 import path from 'path';
 
 const router = express.Router();
+
+// LINE Profile API
+async function getLineProfile(userId) {
+  try {
+    const response = await axios.get(
+      `https://api.line.me/v2/bot/profile/${userId}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${process.env.LINE_CHANNEL_ACCESS_TOKEN}`
+        },
+        timeout: 5000
+      }
+    );
+    return response.data.displayName;
+  } catch (error) {
+    console.error('Failed to get LINE profile:', error.message);
+    return null;
+  }
+}
 
 // LIFF認証ミドルウェア
 function requireLineUser(req, res, next) {
@@ -105,13 +125,17 @@ router.post('/register', requireLineUser, async (req, res) => {
   }
 
   try {
+    // LINE表示名を取得
+    const displayName = await getLineProfile(req.lineUserId);
+
     const result = await linkByFullName(req.db, req.lineUserId, full_name);
-    
+
     // NDJSONログ記録
     const logData = {
       ts: nowJST(),
       kind: 'register',
       userId: req.lineUserId,
+      displayName: displayName,
       inputName: full_name,
       normalized: result.normalizedName,
       result: result.type,
@@ -143,6 +167,34 @@ router.post('/register', requireLineUser, async (req, res) => {
     
   } catch (error) {
     console.error('Register error:', error);
+
+    // エラー時もログを記録
+    try {
+      const displayName = await getLineProfile(req.lineUserId);
+      const errorLogData = {
+        ts: nowJST(),
+        kind: 'register',
+        userId: req.lineUserId,
+        displayName: displayName,
+        inputName: full_name,
+        result: 'ERROR',
+        reason: error.message
+      };
+
+      const date = new Date().toISOString().split('T')[0];
+      const logDir = process.env.LOGS_BASE_PATH || '/app/logs';
+      const logFile = path.join(logDir, 'line', `REGISTER-${date}.ndjson`);
+
+      const dir = path.dirname(logFile);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+
+      fs.appendFileSync(logFile, JSON.stringify(errorLogData) + '\n');
+    } catch (logError) {
+      console.error('Failed to log register error:', logError);
+    }
+
     res.status(500).json({
       code: 'INTERNAL_ERROR',
       message: 'Internal server error'
