@@ -224,7 +224,7 @@ export async function linkByFullName(db, userId, inputName, actualDisplayName) {
         } else {
           // 新規紐づけ
           db.run(
-            'UPDATE members SET line_user_id = ?, line_display_name = ?, updated_at = ? WHERE id = ?',
+            'UPDATE members SET line_user_id = ?, line_display_name = ?, is_target = 1, updated_at = ? WHERE id = ?',
             [userId, displayNameToSave, nowJST(), member.id],
             (err) => {
               if (err) {

@@ -144,7 +144,7 @@
                             登録
                         </button>
                         <button type="button" class="btn btn-secondary" id="skip-btn">
-                            スキップ
+                            中断
                         </button>
                     </div>
                 </form>
@@ -331,11 +331,9 @@
             }
         }
 
-        // スキップ処理
+        // 中断処理
         function handleSkip() {
-            if (confirm('会員登録をスキップしますか？\nスキップすると出欠回答機能が利用できません。')) {
-                closeLiffWindow();
-            }
+            closeLiffWindow();
         }
 
         // 登録後の遷移
