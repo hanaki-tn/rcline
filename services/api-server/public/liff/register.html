@@ -275,10 +275,22 @@
 
             try {
                 console.log('[register] APIリクエスト開始: /api/liff/register');
-                const response = await apiRequest('/api/liff/register', {
+
+                // 認証用のLINEユーザーIDを取得
+                const lineUserId = await ensureLineUserId();
+                if (!lineUserId) {
+                    throw new Error('LINE認証が必要です');
+                }
+
+                // 直接fetchを使用してAPIを呼び出し（apiRequest()を使わない）
+                const response = await fetch(CONFIG.API_BASE + '/api/liff/register', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
+                        // 環境に応じた認証ヘッダー設定
+                        ...(CONFIG.isDev
+                            ? { 'x-dev-line-user-id': lineUserId }
+                            : { 'x-line-user-id': lineUserId })
                     },
                     body: JSON.stringify({ full_name: fullName })
                 });
@@ -286,6 +298,7 @@
                 console.log('[register] APIレスポンス受信 - ステータス:', response.status);
 
                 if (response.ok) {
+                    // 200 OK - 登録成功
                     const result = await response.json();
                     console.log('[register] 登録成功:', result);
                     uiShowSuccess('会員登録が完了しました。');
@@ -303,9 +316,11 @@
                     setTimeout(() => {
                         navigateAfterRegistration();
                     }, 1000);
-                } else {
+
+                } else if (response.status === 422) {
+                    // 422 Unprocessable Entity - 会員が見つからない
                     const error = await response.json();
-                    console.error('[register] APIエラー:', error);
+                    console.error('[register] 422エラー:', error);
 
                     if (error.code === 'NO_MATCH') {
                         uiShowError('入力された名前が会員名簿と一致しませんでした。正確な漢字フルネームを入力してください。');
@@ -316,15 +331,27 @@
                     // ボタン再有効化
                     submitBtn.disabled = false;
                     submitBtn.textContent = '登録';
+
+                } else {
+                    // その他のHTTPエラー
+                    const error = await response.json().catch(() => ({}));
+                    console.error('[register] HTTPエラー:', response.status, error);
+                    uiShowError(error.message || `エラーが発生しました。(${response.status})`);
+
+                    // ボタン再有効化
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = '登録';
                 }
+
             } catch (error) {
+                // ネットワークエラーなど
                 console.error('[register] 登録処理エラー:', error);
                 console.error('[register] エラー詳細:', {
                     message: error.message,
                     stack: error.stack
                 });
                 uiShowError('通信エラーが発生しました。LINEアプリ内で開いているかをご確認のうえ、もう一度お試しください。');
-                
+
                 // ボタン再有効化
                 submitBtn.disabled = false;
                 submitBtn.textContent = '登録';
